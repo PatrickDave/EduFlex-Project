@@ -1,0 +1,11 @@
+# Uploaded files must never be served or executed by Apache.
+# A .php file smuggled past validation would otherwise run as server code.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+
+php_flag engine off

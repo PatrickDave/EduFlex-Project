@@ -1,0 +1,1213 @@
+/* ==========================================================================
+   EduFlex — AI-Powered Personalized Learning Companion
+   Design system stylesheet.
+
+   Token values are identical to the Figma variable collection "EduFlex Tokens"
+   in file A4ZVR459ciHA8nFjNTuyU8. If a token changes in Figma, change it here
+   and nowhere else. Never hardcode a colour in a page.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   0. FONT
+
+   Inter is vendored under assets/vendor/fonts rather than loaded from Google
+   Fonts. A defense room with no working wifi should still render the system
+   exactly as designed. The files are the Latin subset, four weights.
+   -------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../vendor/fonts/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../vendor/fonts/inter-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../vendor/fonts/inter-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../vendor/fonts/inter-latin-700-normal.woff2') format('woff2');
+}
+
+/* --------------------------------------------------------------------------
+   1. TOKENS
+   -------------------------------------------------------------------------- */
+:root {
+  /* Brand */
+  --ef-primary:          #0EA5E9;
+  --ef-primary-hover:    #0284C7;
+  --ef-primary-bright:   #38BDF8;
+  --ef-cyan:             #22D3EE;
+  --ef-deep:             #075985;
+
+  /* Surfaces */
+  --ef-surface:          #FFFFFF;
+  --ef-surface-subtle:   #F7FBFE;
+  --ef-surface-sky:      #E8F4FD;
+  --ef-ink:              #0B2434;
+
+  /* Borders */
+  --ef-border:           #DEEAF2;
+  --ef-border-input:     #D2E2EE;
+
+  /* Text */
+  --ef-text:             #0F1B24;
+  --ef-text-2:           #587286;
+  --ef-text-muted:       #93A9B8;
+  --ef-on-primary:       #FFFFFF;
+
+  /* Mastery bands — these map 1:1 to the thresholds in the mastery model.
+     mastered >= 85 | developing 70-84 | weak < 70 | empty = under 5 items   */
+  --ef-mastered:         #10B981;
+  --ef-mastered-bg:      #E7F8F1;
+  --ef-developing:       #F59E0B;
+  --ef-developing-bg:    #FEF4E4;
+  --ef-weak:             #F43F5E;
+  --ef-weak-bg:          #FDEBEF;
+  --ef-empty:            #EDF3F7;
+
+  /* Radii */
+  --ef-r-sm: 8px;
+  --ef-r-md: 12px;
+  --ef-r-lg: 16px;
+  --ef-r-xl: 24px;
+  --ef-r-pill: 999px;
+
+  /* Spacing */
+  --ef-s-1: 4px;
+  --ef-s-2: 8px;
+  --ef-s-3: 12px;
+  --ef-s-4: 16px;
+  --ef-s-6: 24px;
+  --ef-s-8: 32px;
+  --ef-s-12: 48px;
+  --ef-s-16: 64px;
+
+  /* Elevation */
+  --ef-shadow-sm: 0 4px 14px rgba(11, 60, 90, .07);
+  --ef-shadow-md: 0 10px 28px rgba(11, 60, 90, .10);
+  --ef-shadow-lg: 0 18px 44px rgba(11, 60, 90, .14);
+
+  /* Shell */
+  --ef-sidebar-w: 244px;
+  --ef-topbar-h: 72px;
+}
+
+/* --------------------------------------------------------------------------
+   2. BASE
+   -------------------------------------------------------------------------- */
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--ef-surface-subtle);
+  color: var(--ef-text);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+
+a { text-decoration: none; color: inherit; }
+h1, h2, h3, h4, h5 { color: var(--ef-text); font-weight: 700; margin: 0; letter-spacing: -.01em; }
+p { margin: 0; }
+
+.ef-muted    { color: var(--ef-text-muted); }
+.ef-second   { color: var(--ef-text-2); }
+.ef-primary  { color: var(--ef-primary); }
+
+.ef-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ef-primary);
+}
+
+/* --------------------------------------------------------------------------
+   3. BUTTONS
+   -------------------------------------------------------------------------- */
+.ef-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--ef-r-pill);
+  padding: 11px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .06s ease;
+  white-space: nowrap;
+}
+.ef-btn:active { transform: translateY(1px); }
+
+.ef-btn-primary { background: var(--ef-primary); color: var(--ef-on-primary); }
+.ef-btn-primary:hover { background: var(--ef-primary-hover); color: var(--ef-on-primary); }
+
+.ef-btn-ghost {
+  background: var(--ef-surface);
+  border-color: var(--ef-border);
+  color: var(--ef-text-2);
+}
+.ef-btn-ghost:hover { border-color: var(--ef-primary-bright); color: var(--ef-primary); }
+
+.ef-btn-soft { background: var(--ef-surface-sky); color: var(--ef-primary); }
+.ef-btn-soft:hover { background: #D8ECFB; }
+
+.ef-btn-lg { padding: 15px 30px; font-size: 15px; }
+.ef-btn-sm { padding: 8px 14px; font-size: 11.5px; }
+.ef-btn-block { width: 100%; }
+
+/* Square-ish button used inside forms */
+.ef-btn-field { border-radius: var(--ef-r-md); }
+
+/* --------------------------------------------------------------------------
+   4. CARDS
+   -------------------------------------------------------------------------- */
+.ef-card {
+  background: var(--ef-surface);
+  border: 1px solid var(--ef-border);
+  border-radius: var(--ef-r-lg);
+  padding: 22px 24px;
+}
+.ef-card-lg { border-radius: 18px; padding: 24px; }
+.ef-card-flat { border: 0; box-shadow: var(--ef-shadow-sm); }
+.ef-card-sky { background: var(--ef-surface-sky); border-color: transparent; }
+
+.ef-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.ef-card-title { font-size: 16px; font-weight: 700; }
+.ef-card-sub { font-size: 11.5px; color: var(--ef-text-muted); margin-top: 3px; }
+
+/* --------------------------------------------------------------------------
+   5. BADGES, PILLS, CHIPS
+   -------------------------------------------------------------------------- */
+.ef-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--ef-r-pill);
+  background: var(--ef-surface-sky);
+  color: var(--ef-primary);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.ef-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: var(--ef-r-pill);
+  background: var(--ef-surface);
+  border: 1px solid var(--ef-border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ef-text-2);
+  cursor: pointer;
+}
+.ef-chip:hover { border-color: var(--ef-primary-bright); color: var(--ef-primary); }
+
+/* Mastery band pill. Class is driven by the computed band, never by hand. */
+.ef-band {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: var(--ef-r-pill);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.ef-band-mastered   { background: var(--ef-mastered-bg);   color: var(--ef-mastered); }
+.ef-band-developing { background: var(--ef-developing-bg); color: var(--ef-developing); }
+.ef-band-weak       { background: var(--ef-weak-bg);       color: var(--ef-weak); }
+.ef-band-none       { background: var(--ef-empty);         color: var(--ef-text-muted); }
+
+/* Bloom level tag */
+.ef-bloom {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--ef-r-sm);
+  background: var(--ef-surface-sky);
+  color: var(--ef-deep);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   6. FORMS
+   -------------------------------------------------------------------------- */
+.ef-field { margin-bottom: 16px; }
+.ef-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ef-text-2);
+  margin-bottom: 7px;
+}
+.ef-label a { font-size: 12px; font-weight: 600; color: var(--ef-primary); }
+
+.ef-input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1.2px solid var(--ef-border-input);
+  border-radius: var(--ef-r-md);
+  background: var(--ef-surface);
+  font-size: 13px;
+  color: var(--ef-text);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.ef-input::placeholder { color: var(--ef-text-muted); }
+.ef-input:focus {
+  border-color: var(--ef-primary-bright);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, .18);
+}
+
+.ef-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: var(--ef-text-2);
+  cursor: pointer;
+}
+.ef-check input { width: 15px; height: 15px; accent-color: var(--ef-primary); }
+
+/* Validation state on an input */
+.ef-input.is-invalid { border-color: var(--ef-weak); }
+.ef-input.is-invalid:focus { box-shadow: 0 0 0 3px rgba(244, 63, 94, .16); }
+
+/* Field-level error message */
+.ef-error {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ef-weak);
+  margin-top: 6px;
+}
+
+/* Form-level banner */
+.ef-alert {
+  border-radius: var(--ef-r-md);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+.ef-alert-error { background: var(--ef-weak-bg);     color: #9F1239; }
+.ef-alert-ok    { background: var(--ef-mastered-bg); color: #065F46; }
+.ef-alert-info  { background: var(--ef-surface-sky); color: var(--ef-deep); }
+
+/* --------------------------------------------------------------------------
+   7. APP SHELL
+   -------------------------------------------------------------------------- */
+.ef-shell {
+  display: flex;
+  min-height: 100vh;
+  /* The sidebar is sticky and therefore only one viewport tall. This paints
+     its column for the full height of the page so a long page does not show
+     a white gap below the navigation. */
+  background: linear-gradient(
+    to right,
+    var(--ef-surface) 0,
+    var(--ef-surface) var(--ef-sidebar-w),
+    var(--ef-border)  var(--ef-sidebar-w),
+    var(--ef-border)  calc(var(--ef-sidebar-w) + 1px),
+    transparent       calc(var(--ef-sidebar-w) + 1px)
+  );
+}
+
+.ef-sidebar {
+  width: var(--ef-sidebar-w);
+  flex: 0 0 var(--ef-sidebar-w);
+  background: var(--ef-surface);
+  border-right: 1px solid var(--ef-border);
+  padding: 22px 16px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.ef-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 22px; }
+.ef-brand-mark {
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  background: var(--ef-primary);
+  display: grid; place-items: center;
+  color: #fff; font-weight: 700; font-size: 15px;
+  flex: 0 0 auto;
+}
+.ef-brand-name { font-size: 17px; font-weight: 700; line-height: 1.1; }
+.ef-brand-cap {
+  font-size: 8px; font-weight: 600; letter-spacing: .05em;
+  color: var(--ef-text-muted); text-transform: uppercase;
+}
+
+.ef-nav { display: flex; flex-direction: column; gap: 4px; }
+.ef-nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--ef-r-md);
+  font-size: 13.5px; font-weight: 500;
+  color: var(--ef-text-2);
+  transition: background .15s ease;
+}
+.ef-nav-item .ef-nav-ico {
+  width: 17px; height: 17px; border-radius: 5px;
+  background: var(--ef-text-muted);
+  flex: 0 0 auto;
+}
+.ef-nav-item:hover { background: var(--ef-surface-subtle); }
+.ef-nav-item.is-active {
+  background: var(--ef-surface-sky);
+  color: var(--ef-primary);
+  font-weight: 600;
+}
+.ef-nav-item.is-active .ef-nav-ico { background: var(--ef-primary); }
+
+.ef-sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+.ef-sidebar-foot .ef-btn { margin-bottom: 8px; }
+
+.ef-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+
+.ef-topbar {
+  height: var(--ef-topbar-h);
+  flex: 0 0 var(--ef-topbar-h);
+  background: var(--ef-surface);
+  border-bottom: 1px solid var(--ef-border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px;
+  position: sticky; top: 0; z-index: 20;
+}
+.ef-topbar h1 { font-size: 18px; }
+.ef-topbar-actions { display: flex; align-items: center; gap: 14px; }
+
+.ef-search {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 16px 9px 14px;
+  border-radius: var(--ef-r-pill);
+  background: var(--ef-surface-subtle);
+  border: 1px solid var(--ef-border);
+  min-width: 240px;
+}
+.ef-search input {
+  border: 0; background: transparent; outline: none;
+  font-size: 12.5px; width: 100%; color: var(--ef-text);
+}
+.ef-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--ef-primary-bright); flex: 0 0 auto;
+}
+.ef-icon-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 0; background: transparent; cursor: pointer; color: var(--ef-text-2);
+}
+.ef-icon-btn:hover { background: var(--ef-surface-subtle); }
+
+.ef-content { padding: 26px 28px; flex: 1 1 auto; }
+
+.ef-page-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.ef-page-head h2 { font-size: 25px; }
+.ef-page-head p { font-size: 13.5px; color: var(--ef-text-2); margin-top: 4px; }
+
+/* Hamburger, mobile only */
+.ef-burger { display: none; }
+
+/* --------------------------------------------------------------------------
+   8. MASTERY ROWS + PROGRESS
+   -------------------------------------------------------------------------- */
+.ef-mastery { display: flex; flex-direction: column; gap: 16px; }
+.ef-mastery-row-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px;
+}
+.ef-mastery-name { font-size: 13px; font-weight: 500; }
+.ef-mastery-right { display: flex; align-items: center; gap: 8px; }
+.ef-mastery-val { font-size: 13px; font-weight: 700; }
+
+.ef-track {
+  height: 7px; border-radius: 4px;
+  background: var(--ef-empty);
+  overflow: hidden;
+}
+.ef-track > span { display: block; height: 100%; border-radius: 4px; }
+.ef-fill-mastered   { background: var(--ef-mastered); }
+.ef-fill-developing { background: var(--ef-developing); }
+.ef-fill-weak       { background: var(--ef-weak); }
+
+.ef-note {
+  font-size: 10.5px; color: var(--ef-text-muted);
+  line-height: 1.5; margin-top: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   9. STAT TILES
+   -------------------------------------------------------------------------- */
+.ef-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+.ef-stat { background: var(--ef-surface); border: 1px solid var(--ef-border); border-radius: var(--ef-r-lg); padding: 16px; }
+.ef-stat-label {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ef-text-muted);
+}
+.ef-stat-value { font-size: 19px; font-weight: 700; margin-top: 6px; }
+.ef-stat-delta { font-size: 11px; font-weight: 600; color: var(--ef-mastered); margin-top: 2px; }
+
+/* --------------------------------------------------------------------------
+   10. BAR CHART (CSS only, no library)
+   -------------------------------------------------------------------------- */
+.ef-bars {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 12px; height: 196px; padding-top: 10px;
+}
+.ef-bar-col { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ef-bar {
+  width: 100%; max-width: 46px;
+  border-radius: var(--ef-r-sm);
+  background: var(--ef-primary-bright);
+}
+.ef-bar.is-peak { background: var(--ef-primary); }
+.ef-bar.is-zero { background: var(--ef-empty); }
+.ef-bar-label { font-size: 11px; font-weight: 500; color: var(--ef-text-muted); }
+
+/* --------------------------------------------------------------------------
+   11. CHAT
+   -------------------------------------------------------------------------- */
+.ef-thread { display: flex; flex-direction: column; gap: 16px; }
+.ef-msg { display: flex; gap: 10px; max-width: 100%; }
+.ef-msg-ai { justify-content: flex-start; }
+.ef-msg-user { justify-content: flex-end; }
+.ef-msg-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--ef-primary); flex: 0 0 auto;
+}
+.ef-bubble {
+  padding: 15px 18px;
+  border-radius: var(--ef-r-lg);
+  font-size: 13.5px; line-height: 1.65;
+  max-width: 620px;
+}
+.ef-bubble-ai { background: var(--ef-surface); border: 1px solid var(--ef-border); color: var(--ef-text-2); }
+.ef-bubble-user { background: var(--ef-primary); color: var(--ef-on-primary); max-width: 480px; }
+
+.ef-concept {
+  background: var(--ef-surface-sky);
+  border-radius: var(--ef-r-md);
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.ef-concept p { font-size: 12.5px; color: var(--ef-text-2); margin-top: 4px; line-height: 1.6; }
+
+.ef-msg-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 12px; flex-wrap: wrap;
+}
+.ef-source { font-size: 11px; font-weight: 500; color: var(--ef-text-muted); }
+
+/* Citations under a companion answer. Every grounded answer names the passages
+   it came from, so a learner can check the claim against their own document
+   instead of taking it on trust. */
+.ef-sources {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ef-border);
+}
+.ef-sources-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ef-text-muted);
+  margin-right: 2px;
+}
+.ef-source-chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: var(--ef-r-pill);
+  background: var(--ef-surface-sky);
+  color: var(--ef-deep);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* The companion says so when it could not find the answer in the material.
+   Surfacing that is the point of the design, so it gets a visible label. */
+.ef-ungrounded {
+  display: block;
+  margin-bottom: 8px;
+  padding: 3px 9px;
+  border-radius: var(--ef-r-pill);
+  background: var(--ef-developing-bg);
+  color: var(--ef-developing);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+/* Waiting on the provider. Animated so a slow free tier does not read as a
+   frozen page. */
+.ef-typing { color: var(--ef-text-muted); font-size: 13px; }
+.ef-typing::after {
+  content: '';
+  display: inline-block;
+  width: 1em;
+  text-align: left;
+  animation: ef-dots 1.2s steps(4, end) infinite;
+}
+@keyframes ef-dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+}
+
+.ef-composer {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 10px 10px 18px;
+  background: var(--ef-surface);
+  border: 1px solid var(--ef-border);
+  border-radius: var(--ef-r-pill);
+}
+.ef-composer input {
+  flex: 1 1 auto; border: 0; outline: none; background: transparent;
+  font-size: 13px; color: var(--ef-text);
+}
+.ef-send {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--ef-primary); border: 0; color: #fff;
+  display: grid; place-items: center; cursor: pointer; flex: 0 0 auto;
+}
+
+/* Right context rail. Wider than a pure context panel, because it now carries
+   the material library as well as topic context. */
+.ef-rail {
+  width: 344px; flex: 0 0 344px;
+  border-left: 1px solid var(--ef-border);
+  background: var(--ef-surface);
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+.ef-rail h4 {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ef-text-muted); margin-bottom: 12px;
+}
+.ef-rail-body { flex: 1 1 auto; overflow-y: auto; padding: 18px 20px 22px; }
+
+/* Tabs across the top of the rail */
+.ef-tabs {
+  display: flex; gap: 4px;
+  padding: 12px 12px 0;
+  border-bottom: 1px solid var(--ef-border);
+  flex: 0 0 auto;
+}
+.ef-tab {
+  flex: 1 1 0;
+  border: 0; background: transparent; cursor: pointer;
+  padding: 10px 8px 12px;
+  font: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--ef-text-2);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.ef-tab:hover { color: var(--ef-primary); }
+.ef-tab.is-active { color: var(--ef-primary); border-bottom-color: var(--ef-primary); }
+.ef-tab-count {
+  font-size: 10.5px; font-weight: 700;
+  background: var(--ef-sunk, var(--ef-surface-subtle));
+  border-radius: var(--ef-r-pill);
+  padding: 1px 7px;
+  color: var(--ef-text-2);
+}
+.ef-tab.is-active .ef-tab-count { background: var(--ef-surface-sky); color: var(--ef-primary); }
+
+.ef-topic {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px; border-radius: var(--ef-r-md);
+  font-size: 12.5px; margin-bottom: 6px;
+}
+.ef-topic.is-active { background: var(--ef-surface-sky); color: var(--ef-primary); font-weight: 600; }
+
+/* Compact material card inside the rail */
+.ef-mat {
+  border: 1px solid var(--ef-border);
+  border-radius: var(--ef-r-md);
+  padding: 12px 13px;
+  margin-bottom: 10px;
+  background: var(--ef-surface);
+}
+.ef-mat-top { display: flex; align-items: flex-start; gap: 10px; }
+.ef-mat-ico {
+  width: 30px; height: 30px; border-radius: 9px;
+  background: var(--ef-surface-sky); color: var(--ef-primary);
+  display: grid; place-items: center;
+  font-size: 9.5px; font-weight: 700; flex: 0 0 auto;
+}
+.ef-mat-main { flex: 1 1 auto; min-width: 0; }
+.ef-mat-title {
+  font-size: 12.5px; font-weight: 600; line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.ef-mat-meta { font-size: 10.5px; color: var(--ef-text-muted); margin-top: 3px; }
+.ef-mat-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-top: 10px;
+}
+.ef-mat-actions { display: flex; gap: 6px; }
+.ef-mat-actions button {
+  border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 600;
+  color: var(--ef-text-2); padding: 2px 4px;
+}
+.ef-mat-actions button:hover { color: var(--ef-primary); }
+.ef-mat-actions .ef-danger:hover { color: var(--ef-weak); }
+
+/* Drop zone / upload affordance in the rail */
+.ef-drop {
+  border: 1.5px dashed var(--ef-border-input);
+  border-radius: var(--ef-r-md);
+  padding: 18px 14px;
+  text-align: center;
+  margin-bottom: 14px;
+  transition: border-color .15s ease, background .15s ease;
+}
+.ef-drop.is-over { border-color: var(--ef-primary); background: var(--ef-surface-sky); }
+.ef-drop p { font-size: 11.5px; color: var(--ef-text-2); margin: 0 0 10px; line-height: 1.5; }
+
+/* Attachment chip shown inside a chat message */
+.ef-attach-card {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--ef-border);
+  border-radius: var(--ef-r-md);
+  background: var(--ef-surface);
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+
+/* Rail toggle and close, mobile only */
+.ef-rail-toggle { display: none; }
+.ef-rail-close { display: none; }
+.ef-rail-scrim { display: none; }
+
+/* --------------------------------------------------------------------------
+   12. LISTS / TABLES
+   -------------------------------------------------------------------------- */
+.ef-list-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--ef-border);
+  border-radius: var(--ef-r-md);
+  background: var(--ef-surface);
+  margin-bottom: 10px;
+}
+.ef-list-ico {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--ef-surface-sky);
+  display: grid; place-items: center;
+  color: var(--ef-primary); font-size: 13px; font-weight: 700;
+  flex: 0 0 auto;
+}
+.ef-list-main { flex: 1 1 auto; min-width: 0; }
+.ef-list-title { font-size: 13.5px; font-weight: 600; }
+.ef-list-meta { font-size: 11.5px; color: var(--ef-text-muted); margin-top: 2px; }
+
+.ef-table { width: 100%; border-collapse: collapse; }
+.ef-table th {
+  text-align: left; font-size: 10px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ef-text-muted); padding: 0 12px 12px;
+}
+.ef-table td { padding: 14px 12px; border-top: 1px solid var(--ef-border); font-size: 13px; }
+
+/* --------------------------------------------------------------------------
+   12b. QUIZ OPTIONS
+   -------------------------------------------------------------------------- */
+.ef-quiz-options { display: flex; flex-direction: column; gap: 10px; }
+
+.ef-quiz-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border: 1.4px solid var(--ef-border-input);
+  border-radius: var(--ef-r-md);
+  background: var(--ef-surface);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ef-text);
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.ef-quiz-option:hover { border-color: var(--ef-primary-bright); background: var(--ef-surface-subtle); }
+
+.ef-quiz-option.is-selected {
+  border-color: var(--ef-primary);
+  background: var(--ef-surface-sky);
+}
+.ef-quiz-option.is-selected .ef-quiz-key {
+  background: var(--ef-primary);
+  color: var(--ef-on-primary);
+  border-color: var(--ef-primary);
+}
+
+.ef-quiz-key {
+  flex: 0 0 auto;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  border: 1.4px solid var(--ef-border-input);
+  border-radius: 7px;
+  background: var(--ef-surface);
+  font-size: 11.5px; font-weight: 700;
+  color: var(--ef-text-2);
+}
+
+/* Correct / incorrect states, applied after grading */
+.ef-quiz-option.is-correct   { border-color: var(--ef-mastered); background: var(--ef-mastered-bg); }
+.ef-quiz-option.is-incorrect { border-color: var(--ef-weak);     background: var(--ef-weak-bg); }
+
+/* --------------------------------------------------------------------------
+   13. EMPTY STATES
+   Day one has no data. Every data surface needs one of these.
+   -------------------------------------------------------------------------- */
+.ef-empty-state {
+  text-align: center;
+  padding: 44px 24px;
+  border: 1.5px dashed var(--ef-border-input);
+  border-radius: var(--ef-r-lg);
+  background: var(--ef-surface);
+}
+.ef-empty-ico {
+  width: 46px; height: 46px; border-radius: 14px;
+  background: var(--ef-surface-sky); margin: 0 auto 14px;
+}
+.ef-empty-state h5 { font-size: 15px; margin-bottom: 6px; }
+.ef-empty-state p {
+  font-size: 12.5px; color: var(--ef-text-2);
+  max-width: 380px; margin: 0 auto 16px; line-height: 1.6;
+}
+
+/* --------------------------------------------------------------------------
+   14. PUBLIC PAGES (landing / auth)
+   -------------------------------------------------------------------------- */
+.ef-public { background: var(--ef-surface); }
+
+.ef-topnav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 48px;
+  max-width: 1440px; margin: 0 auto;
+}
+.ef-topnav-links { display: flex; gap: 36px; }
+.ef-topnav-links a { font-size: 15px; font-weight: 500; color: var(--ef-text-2); }
+.ef-topnav-links a:hover { color: var(--ef-primary); }
+.ef-topnav-right { display: flex; align-items: center; gap: 24px; }
+.ef-logo { font-size: 26px; font-weight: 700; color: var(--ef-primary-bright); }
+
+.ef-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 60px 48px 90px;
+}
+.ef-hero h1 {
+  font-size: 62px; line-height: 1.06; letter-spacing: -.02em; margin: 22px 0;
+}
+.ef-hero h1 .ef-accent { color: var(--ef-primary); }
+.ef-hero-sub {
+  font-size: 16px; line-height: 1.6; color: var(--ef-text-2); max-width: 470px;
+}
+.ef-hero-ctas { display: flex; gap: 16px; margin-top: 28px; flex-wrap: wrap; }
+
+.ef-hero-visual {
+  position: relative;
+  border-radius: var(--ef-r-xl);
+  background: linear-gradient(135deg, #E9F5FE 0%, #D8EDFC 55%, #CDF4F6 100%);
+  padding: 24px;
+  min-height: 420px;
+  display: grid;
+  place-items: center;
+}
+.ef-hero-visual svg { width: 100%; max-width: 460px; height: auto; }
+
+.ef-float {
+  position: absolute;
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px;
+  border-radius: var(--ef-r-pill);
+  background: var(--ef-surface);
+  box-shadow: var(--ef-shadow-md);
+  font-size: 11.5px; font-weight: 600;
+  white-space: nowrap;
+}
+.ef-float .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.ef-float-tl { top: 34px; left: -14px; }
+.ef-float-br { bottom: 44px; right: -18px; }
+
+.ef-float-card {
+  position: absolute;
+  bottom: -28px; left: -40px;
+  width: 330px;
+  background: var(--ef-surface);
+  border-radius: var(--ef-r-lg);
+  box-shadow: var(--ef-shadow-lg);
+  padding: 16px 20px 16px 16px;
+  display: flex; gap: 12px;
+}
+.ef-float-card .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--ef-primary); flex: 0 0 auto; }
+.ef-float-card strong { font-size: 14px; display: block; }
+.ef-float-card p { font-size: 12px; color: var(--ef-text-2); margin-top: 4px; line-height: 1.5; }
+
+/* Auth */
+.ef-auth-page {
+  min-height: 100vh;
+  background: linear-gradient(90deg, #F5FAFE 0%, #FFFFFF 50%, #F2FBFA 100%);
+  display: flex; flex-direction: column;
+}
+.ef-auth-body { flex: 1 1 auto; display: grid; place-items: center; padding: 40px 20px; }
+.ef-auth-card {
+  width: 100%; max-width: 420px;
+  background: var(--ef-surface);
+  border: 1px solid var(--ef-border);
+  border-radius: 18px;
+  box-shadow: var(--ef-shadow-md);
+  padding: 40px;
+}
+.ef-auth-card h2 { font-size: 27px; text-align: center; }
+.ef-auth-card .ef-auth-sub {
+  font-size: 13px; color: var(--ef-text-2);
+  text-align: center; margin: 8px 0 26px;
+}
+.ef-auth-foot { text-align: center; font-size: 12.5px; color: var(--ef-text-2); margin-top: 20px; }
+.ef-auth-foot a { color: var(--ef-primary); font-weight: 600; }
+
+.ef-page-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 48px;
+  border-top: 1px solid var(--ef-border);
+  background: var(--ef-surface);
+  font-size: 11.5px; color: var(--ef-text-muted);
+  flex-wrap: wrap; gap: 12px;
+}
+.ef-page-footer a { color: var(--ef-text-2); font-weight: 500; margin-left: 26px; }
+
+/* --------------------------------------------------------------------------
+   15. QUESTION RUNNER
+
+   The colours here are the mastery band colours, used for right and wrong.
+   Correct is the "mastered" green, incorrect the "weak" rose. Reusing them
+   means a learner reads the same colour language on every screen.
+   -------------------------------------------------------------------------- */
+.ef-runner { max-width: 760px; margin: 0 auto; }
+
+.ef-runner-bar {
+  height: 6px;
+  background: var(--ef-empty);
+  border-radius: var(--ef-r-pill);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.ef-runner-fill {
+  height: 100%;
+  width: 0;
+  background: var(--ef-primary);
+  border-radius: var(--ef-r-pill);
+  transition: width .3s ease;
+}
+
+.ef-q-count {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ef-text-muted);
+}
+
+.ef-q-text {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--ef-text);
+  margin: 10px 0 20px;
+}
+
+.ef-options { display: flex; flex-direction: column; gap: 10px; }
+
+.ef-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--ef-surface);
+  border: 1.5px solid var(--ef-border);
+  border-radius: var(--ef-r-md);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ef-text);
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.ef-option:hover:not(:disabled) {
+  border-color: var(--ef-primary-bright);
+  background: var(--ef-surface-subtle);
+}
+.ef-option:disabled { cursor: default; }
+
+/* Without min-width:0 a flex child refuses to shrink, and long option text
+   runs past the edge of the button instead of wrapping onto a second line. */
+.ef-option > span:last-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+
+.ef-option-key {
+  flex: 0 0 24px;
+  height: 24px;
+  border-radius: var(--ef-r-pill);
+  background: var(--ef-surface-sky);
+  color: var(--ef-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ef-option-selected { border-color: var(--ef-primary); background: var(--ef-surface-sky); }
+.ef-option-selected .ef-option-key { background: var(--ef-primary); color: var(--ef-on-primary); }
+
+.ef-option-right {
+  border-color: var(--ef-mastered);
+  background: var(--ef-mastered-bg);
+}
+.ef-option-right .ef-option-key { background: var(--ef-mastered); color: #fff; }
+
+.ef-option-wrong {
+  border-color: var(--ef-weak);
+  background: var(--ef-weak-bg);
+}
+.ef-option-wrong .ef-option-key { background: var(--ef-weak); color: #fff; }
+
+.ef-feedback {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: var(--ef-r-md);
+  border: 1px solid var(--ef-border);
+  background: var(--ef-surface-subtle);
+}
+.ef-feedback-title { font-size: 13.5px; font-weight: 700; margin-bottom: 6px; }
+.ef-feedback-right .ef-feedback-title { color: var(--ef-mastered); }
+.ef-feedback-wrong .ef-feedback-title { color: var(--ef-weak); }
+.ef-feedback p { font-size: 13px; line-height: 1.65; color: var(--ef-text-2); margin: 0; }
+
+.ef-runner-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+/* Result screen */
+.ef-score-ring {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: var(--ef-surface-sky);
+  border: 6px solid var(--ef-primary);
+}
+.ef-ring-mastered   { border-color: var(--ef-mastered);   background: var(--ef-mastered-bg); }
+.ef-ring-developing { border-color: var(--ef-developing); background: var(--ef-developing-bg); }
+.ef-ring-weak       { border-color: var(--ef-weak);       background: var(--ef-weak-bg); }
+
+.ef-score-value { font-size: 34px; font-weight: 700; color: var(--ef-deep); line-height: 1; }
+.ef-score-label { font-size: 11px; font-weight: 600; color: var(--ef-text-2); margin-top: 4px; }
+
+.ef-review-item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--ef-border);
+}
+.ef-review-item:last-child { border-bottom: 0; }
+.ef-review-q { font-size: 14px; font-weight: 600; line-height: 1.55; margin-bottom: 8px; }
+.ef-review-line { font-size: 12.5px; line-height: 1.7; color: var(--ef-text-2); }
+.ef-review-right { color: var(--ef-mastered); font-weight: 600; }
+.ef-review-wrong { color: var(--ef-weak); font-weight: 600; }
+
+/* --------------------------------------------------------------------------
+   16. RESPONSIVE
+   The Android build is a WebView wrapper around these same pages, so the
+   mobile storyboard frames are these breakpoints. Do not fork the markup.
+   -------------------------------------------------------------------------- */
+@media (max-width: 1200px) {
+  .ef-hero { gap: 32px; }
+  .ef-hero h1 { font-size: 50px; }
+}
+
+/* Below this the rail becomes a slide-over, because the chat needs the width.
+   It is never simply hidden: the library lives in there now, and hiding it
+   would remove the only way to upload. */
+@media (max-width: 1080px) {
+  .ef-rail {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 70;
+    width: min(344px, 88vw); flex-basis: auto;
+    transform: translateX(100%);
+    transition: transform .22s ease;
+    box-shadow: var(--ef-shadow-lg);
+  }
+  .ef-rail.is-open { transform: translateX(0); }
+
+  .ef-rail-toggle {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--ef-border);
+    background: var(--ef-surface);
+    border-radius: var(--ef-r-pill);
+    padding: 8px 14px;
+    font: inherit; font-size: 12px; font-weight: 600;
+    color: var(--ef-text-2); cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .ef-rail-toggle:hover { color: var(--ef-primary); border-color: var(--ef-primary-bright); }
+
+  /* With the rail open it covers the toggle, so closing needs its own control.
+     Two ways out: this button, and tapping the scrim behind the panel. */
+  .ef-rail-close {
+    display: grid; place-items: center;
+    width: 32px; height: 32px;
+    margin: 6px 4px 0 2px;
+    border: 0; background: transparent; cursor: pointer;
+    border-radius: var(--ef-r-sm);
+    color: var(--ef-text-2); font-size: 18px; line-height: 1;
+    flex: 0 0 auto;
+  }
+  .ef-rail-close:hover { background: var(--ef-surface-subtle); color: var(--ef-primary); }
+
+  .ef-rail-scrim {
+    display: block;
+    position: fixed; inset: 0; z-index: 65;
+    background: rgba(11, 36, 52, .42);
+    opacity: 0; pointer-events: none;
+    transition: opacity .22s ease;
+  }
+  .ef-rail-scrim.is-open { opacity: 1; pointer-events: auto; }
+}
+
+@media (max-width: 992px) {
+  .ef-hero { grid-template-columns: 1fr; padding: 32px 24px 64px; }
+  .ef-hero-visual { min-height: 340px; order: -1; }
+  .ef-float-card { position: static; width: 100%; margin-top: 18px; }
+  .ef-float { display: none; }
+  .ef-topnav-links { display: none; }
+}
+
+@media (max-width: 860px) {
+  /* Sidebar becomes an off-canvas drawer */
+  .ef-shell { background: none; }
+
+  .ef-sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 60;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: var(--ef-shadow-lg);
+  }
+  .ef-sidebar.is-open { transform: translateX(0); }
+
+  .ef-scrim {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(11, 36, 52, .42);
+    opacity: 0; pointer-events: none; transition: opacity .22s ease;
+  }
+  .ef-scrim.is-open { opacity: 1; pointer-events: auto; }
+
+  .ef-burger {
+    display: grid; place-items: center;
+    width: 36px; height: 36px; border-radius: 10px;
+    border: 1px solid var(--ef-border); background: var(--ef-surface);
+    cursor: pointer; flex: 0 0 auto;
+  }
+  .ef-burger span {
+    display: block; width: 16px; height: 2px; border-radius: 2px;
+    background: var(--ef-text-2); box-shadow: 0 -5px 0 var(--ef-text-2), 0 5px 0 var(--ef-text-2);
+  }
+
+  .ef-topbar { padding: 0 16px; gap: 12px; }
+  .ef-topbar h1 { font-size: 16px; }
+  .ef-search { display: none; }
+  .ef-content { padding: 18px 16px; }
+  .ef-page-head h2 { font-size: 21px; }
+
+  .ef-hero h1 { font-size: 38px; }
+  .ef-topnav { padding: 16px 20px; }
+  .ef-page-footer { padding: 16px 20px; }
+  .ef-page-footer a { margin: 0 18px 0 0; }
+
+  .ef-auth-card { padding: 28px 22px; }
+  .ef-bubble { max-width: 100%; }
+  .ef-bars { height: 150px; gap: 7px; }
+  .ef-card, .ef-card-lg { padding: 18px 16px; }
+}
+
+@media (max-width: 520px) {
+  .ef-hero h1 { font-size: 32px; }
+  .ef-hero-ctas .ef-btn { width: 100%; }
+  .ef-stats { grid-template-columns: 1fr 1fr; }
+  .ef-page-head { align-items: flex-start; flex-direction: column; }
+}
+
+/* Utility */
+.ef-row { display: flex; gap: 20px; align-items: flex-start; }
+.ef-col { flex: 1 1 0; min-width: 0; }
+.ef-col-fixed-360 { flex: 0 0 360px; }
+.ef-stack { display: flex; flex-direction: column; gap: 20px; }
+.ef-hide-sm { display: initial; }
+
+@media (max-width: 860px) {
+  .ef-row { flex-direction: column; }
+  .ef-col-fixed-360 { flex: 1 1 auto; width: 100%; }
+  .ef-hide-sm { display: none; }
+}
