@@ -5,7 +5,7 @@
 -- Built directly from the Data Dictionary in Chapter III (Tables 4 to 15).
 -- Column names, types, lengths and nullability match the manuscript.
 --
--- Three columns are ADDED beyond the manuscript. They are marked
+-- Several columns and tables are ADDED beyond the manuscript. They are marked
 -- "ADDED" below and are listed in database/SCHEMA-NOTES.md. Update the
 -- Chapter III data dictionary to match before your final defense.
 --
@@ -31,6 +31,9 @@ CREATE TABLE user (
   program        VARCHAR(100) NOT NULL DEFAULT 'BS Information Technology',
   year_level     TINYINT(1)   NOT NULL DEFAULT 1,
   account_status VARCHAR(20)  NOT NULL DEFAULT 'active',
+  -- ADDED: path to the learner's uploaded profile picture, relative to the
+  -- project root, or NULL when they have not set one. See SCHEMA-NOTES.md 7.
+  avatar_path    VARCHAR(255) NULL DEFAULT NULL,
   created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
   UNIQUE KEY uq_user_email (email),
@@ -329,3 +332,31 @@ INSERT INTO bloom_level (bloom_level, sort_order, weight) VALUES
   ('Analyze',    4, 1.8),
   ('Evaluate',   5, 2.0),
   ('Create',     6, 2.2);
+
+-- ---------------------------------------------------------------------------
+-- LOGIN ATTEMPT  (ADDED -- not in the Chapter III data dictionary)
+--
+-- One row per FAILED sign-in attempt. Successful logins are never recorded,
+-- and a successful login deletes the rows for that email and address.
+--
+-- Without this table the login form accepts unlimited guesses at whatever rate
+-- the network allows, which is the only thing between a weak password and an
+-- account. A counter in the session would not do: an attacker simply does not
+-- send the cookie.
+--
+-- No foreign key to `user` on purpose. Attempts against an email that does not
+-- exist must be counted too, otherwise the throttle itself becomes a way to
+-- discover which emails are registered.
+--
+-- Pruned by includes/security.php on each successful login, so it stays small
+-- without a scheduled job.
+-- ---------------------------------------------------------------------------
+CREATE TABLE login_attempt (
+  attempt_id   INT(11)      NOT NULL AUTO_INCREMENT,
+  email        VARCHAR(255) NOT NULL,
+  ip_address   VARCHAR(45)  NOT NULL,
+  attempted_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (attempt_id),
+  KEY idx_login_identity (email, ip_address, attempted_at),
+  KEY idx_login_ip (ip_address, attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

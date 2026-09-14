@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/ai.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/notifications.php';
 require_once __DIR__ . '/../config/database.php';
 
 const TOPIC_MIN_NAME_LEN = 3;
@@ -303,6 +304,35 @@ function topics_detect(int $resourceId, int $userId): array
         }
         error_log('EduFlex topic insert failed: ' . $e->getMessage());
         return $fail('The topics could not be saved.');
+    }
+
+    /* Only when something was actually added. Re-running detection on a
+       material whose topics are all already tracked finds nothing new, and a
+       second "12 topics found" notification for the same twelve topics is
+       noise. Written after the commit, and notify() never throws, so a
+       detection run that cost real quota cannot be lost to a failed
+       notification. */
+    if ($inserted > 0) {
+        $names = array_slice(
+            array_map(static fn($t) => $t['topic'], $merged),
+            0,
+            3
+        );
+        notify(
+            $userId,
+            'topics_found',
+            notifications_plural($inserted, 'new topic') . ' in '
+                . mb_substr((string) $resource['title'], 0, 120),
+            sprintf(
+                'EduFlex read %d of %d sections and is now tracking %s. '
+                . 'Each topic needs %d scored answers before it gets a mastery score.',
+                $calls - $failed,
+                count($chunks),
+                $names === [] ? 'them' : implode(', ', $names)
+                    . ($inserted > count($names) ? ' and others' : ''),
+                MASTERY_MIN_ITEMS
+            )
+        );
     }
 
     return [

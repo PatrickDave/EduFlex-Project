@@ -16,7 +16,9 @@ if (auth_is_logged_in() && auth_user() !== null) {
 
 $errors = [];
 $email  = '';
-$next   = $_GET['next'] ?? '';
+/* Validated on the way in as well as on the way out, so a crafted link cannot
+   put a hostile value into the hidden field in the first place. */
+$next   = auth_safe_redirect_target($_GET['next'] ?? null, '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = (string) ($_POST['email'] ?? '');
@@ -26,19 +28,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $result = auth_login($email, (string) ($_POST['password'] ?? ''));
         if ($result['ok']) {
-            $target = 'app/dashboard.php';
-            // Only follow a "next" value that stays inside this application.
-            $candidate = (string) ($_POST['next'] ?? '');
-            if ($candidate !== '' && !preg_match('#^(https?:)?//#', $candidate)) {
-                $target = $candidate;
-            }
-            redirect($target);
+            /* Only follow a "next" value that stays inside this application.
+               The rule lives in auth_safe_redirect_target(); the check that used
+               to be written inline here let `/\evil.example.com` through, which
+               was a working open redirect. */
+            redirect(auth_safe_redirect_target($_POST['next'] ?? null));
         }
         $errors = $result['errors'];
     }
 }
 
 $justRegistered = flash_get('registered') !== null;
+
+/* Set by app/actions/delete_account.php. The session is already destroyed by
+   the time the learner arrives here, so this cannot be a flash message. It is
+   only an acknowledgement, and it names no account. */
+$justDeleted = isset($_GET['deleted']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -70,6 +75,12 @@ $justRegistered = flash_get('registered') !== null;
         </div>
       <?php endif; ?>
 
+      <?php if ($justDeleted): ?>
+        <div class="ef-alert ef-alert-ok">
+          Your account and everything stored with it have been deleted.
+        </div>
+      <?php endif; ?>
+
       <?php if (!empty($errors['form'])): ?>
         <div class="ef-alert ef-alert-error"><?= e($errors['form']) ?></div>
       <?php endif; ?>
@@ -86,18 +97,29 @@ $justRegistered = flash_get('registered') !== null;
         </div>
 
         <div class="ef-field">
+          <?php
+          /* There is no password reset in EduFlex: it needs outbound email,
+             which the system deliberately does not have. The link used to be
+             href="#", which did nothing at all. It now points at the one thing
+             that can actually help, and Settings has Change password for anyone
+             who is already signed in. */
+          ?>
           <label class="ef-label" for="password">
             Password
-            <a href="#">Forgot Password?</a>
+            <a href="app/support.php">Cannot sign in?</a>
           </label>
           <input class="ef-input" type="password" id="password" name="password"
                  placeholder="••••••••" autocomplete="current-password" required>
         </div>
 
-        <label class="ef-check" style="margin-bottom:20px;">
-          <input type="checkbox" name="remember" value="1">
-          Remember me for 30 days
-        </label>
+        <?php
+        /* "Remember me for 30 days" used to sit here as an unchecked box that
+           nothing read. The session cookie expires when the browser closes, so
+           the label was simply untrue. Removed rather than implemented: a real
+           remember-me needs a second long-lived credential table, and that is
+           not going in before the feature freeze. Same reasoning as the absent
+           notification toggles. */
+        ?>
 
         <button type="submit" class="ef-btn ef-btn-primary ef-btn-block ef-btn-field">
           Log In
@@ -119,7 +141,7 @@ $justRegistered = flash_get('registered') !== null;
     <span>
       <a href="#">Privacy Policy</a>
       <a href="#">Terms of Service</a>
-      <a href="#">Contact Support</a>
+      <a href="app/support.php">Contact Support</a>
     </span>
   </footer>
 </div>

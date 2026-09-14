@@ -30,7 +30,12 @@ eduflex-ui/
     growth.php             Mastery over time, Bloom level per topic
     scores.php             Overall mastery ring, mastery by topic
     history.php            Completed activities with resulting bands
-    settings.php           Profile, security, study goal, notifications
+    settings.php           Profile picture, personal details, change password,
+                           export my data, delete my account
+    notifications.php      What EduFlex did with your material. Read only:
+                           nothing on this page writes a notification.
+    support.php            Send a request, see your own requests, static FAQ
+    actions/               POST endpoints. Every state change goes through one.
   config/
     database.php           PDO connection. Edit credentials here.
   includes/
@@ -44,19 +49,36 @@ eduflex-ui/
     resources.php          Upload, processing, listing, deletion
     extract.php            PDF and DOCX text extraction, chunking
     stats.php              Every read model the screens use
+    notifications.php      Writing and reading notifications, and the rule
+                           that a notification never breaks its own event
+    support.php            Support requests: the fixed type list, validation
+    security.php           Response headers, error output, login throttling
+    avatar.php             Profile pictures: validation, storage, initials
   partials/
     sidebar.php            Sidebar markup, one copy for every page
     topbar.php             Header markup, one copy for every page
   database/
     01_schema.sql          The full schema. Import this into phpMyAdmin.
-    SCHEMA-NOTES.md        Three columns added beyond Chapter III, and why
+    SCHEMA-NOTES.md        Seven deviations from Chapter III, and why each one
   tests/
     auth_test.php          40 checks
-    extract_test.php       32 checks
+    extract_test.php       32 checks (5 of them need the PHP zip extension;
+                           without it the DOCX block reports SKIP and the
+                           suite reports 27)
     ai_test.php            63 checks
     questions_test.php     73 checks
     attempts_test.php      81 checks, including the mastery arithmetic
     chat_test.php          69 checks, including the grounding rules
+    notifications_test.php 77 checks, including that a failed notification
+                           never breaks the event that caused it
+    support_test.php       39 checks, including that request_type cannot come
+                           from the POST body
+    settings_test.php      60 checks, including that deleting an account
+                           removes every row for that learner and no other
+    security_test.php      79 checks: the open-redirect table, the response
+                           headers, login throttling, session expiry
+    avatar_test.php        87 checks, including two polyglot files that
+                           getimagesize() alone accepts as valid PNGs
     runner_browser_test.py 54 checks against a running system (Playwright)
     chat_browser_test.py   29 checks against a running system (Playwright)
   assets/
@@ -65,26 +87,105 @@ eduflex-ui/
     vendor/                Bootstrap 5.3.3, jQuery 3.7.1 and Inter, all local.
                            The system makes no external network request at all,
                            so it renders identically in a room with no wifi.
-  build_pages.py           Regenerates the 9 app pages from one template
+  build_pages.py           Regenerates the 11 app pages from one template
 ```
 
 ## 1b. Security decisions already made
 
-Worth knowing, because a panel may ask:
+Worth knowing, because a panel may ask. `includes/security.php` holds the
+response-header, error-output and throttling controls; `tests/security_test.php`
+asserts all of them.
+
+**Credentials and sessions**
 
 - Passwords are hashed with `password_hash()` using bcrypt. Nothing stores or
   logs a plain password. `password_needs_rehash` upgrades old hashes on login.
-- Every query uses a prepared statement. No SQL is built by concatenation.
+- One password rule, `auth_password_error()`, shared by registration and the
+  change-password form. Changing a password verifies the current one first and
+  regenerates the session ID.
 - Login gives the same message for a wrong password and an unknown email, so
   nobody can use the form to discover which emails are registered.
 - `session_regenerate_id(true)` runs on login, which defeats session fixation.
-- Session cookies are `HttpOnly` and `SameSite=Lax`.
-- Every form carries a CSRF token, checked with `hash_equals`.
-- All output goes through `e()`, which escapes for HTML.
+- Session cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` whenever the
+  request arrives over HTTPS. That is detected from the server's own variables,
+  never from a request header, and never hard-coded: sending `Secure` over plain
+  HTTP makes the browser discard the cookie so nobody can sign in at all.
+- Sessions expire two ways: two hours idle, and twelve hours absolute. The
+  absolute limit is the one that matters, because a stolen cookie that is used
+  constantly never goes idle.
+- **Login is rate limited.** Five failures against one email from one address
+  within fifteen minutes refuses that pair; twenty failures from one address
+  across any emails refuses the address. Failures against emails that do not
+  exist are counted too, so the throttle cannot be used as an
+  account-existence oracle. A successful login clears the counter. See
+  `login_attempt` in `database/SCHEMA-NOTES.md`.
 
-Two things still to do before this leaves a local machine: set
-`'secure' => true` on the session cookie once you have HTTPS, and add rate
-limiting on the login form.
+**Input and output**
+
+- Every query uses a prepared statement. No SQL is built by concatenation.
+- Every form carries a CSRF token, checked with `hash_equals`. All eighteen
+  endpoints in `app/actions/` check it and refuse anything that is not a POST.
+- All output goes through `e()`, which escapes for HTML.
+- Uploads are checked by extension **and** by leading bytes, stored under a
+  generated name, and `storage/.htaccess` denies Apache from serving or
+  executing anything in that directory.
+- The login form's `next` destination is validated by
+  `auth_safe_redirect_target()`, which accepts only same-site paths. The check
+  this replaced was bypassable and is described in section 1c.
+
+**Response headers**, sent from `auth_boot()` so no page can forget them:
+
+| Header | Value | Why |
+|---|---|---|
+| `Content-Security-Policy` | `default-src 'self'` and friends | The browser refuses any external origin, so "no external network requests" is enforced rather than merely agreed |
+| `X-Content-Type-Options` | `nosniff` | An uploaded file cannot be sniffed into something executable |
+| `X-Frame-Options` | `DENY` | Clickjacking. The WebView loads pages top-level, so this costs nothing |
+| `Referrer-Policy` | `same-origin` | The page a learner came from does not leak off-site |
+| `Permissions-Policy` | camera, mic, geolocation off | None of them is used |
+| `Strict-Transport-Security` | 1 year, **HTTPS only** | Harmful on plain HTTP, so it is conditional |
+| `X-Powered-By` | removed | XAMPP announced `PHP/8.2.12`, which tells an attacker which exploits to try |
+
+The CSP grants `'unsafe-inline'` for scripts and styles, because the generated
+pages carry inline `<script>` blocks and inline `style` attributes. Say that out
+loud if asked: the policy blocks external code, not injected inline code.
+Escaping through `e()` is what stops injected inline code.
+
+**Error output.** `includes/*.php` never show a database error to a user, because
+the message leaks table and column names. XAMPP ships with `display_errors` on,
+which undid that care, so `security_harden_error_output()` turns it off and logs
+instead. The CLI is exempt so the test suites still show their output, and
+defining `EDUFLEX_DEBUG` as true restores the old behaviour while developing.
+
+**Still to do before this leaves a local machine:** serve it over HTTPS, at
+which point the `Secure` cookie flag and HSTS turn themselves on.
+
+## 1c. The open redirect, and how it was found
+
+Worth recording, because it is the one exploitable defect found in the
+hardening pass and a panel will respect the account of it.
+
+The login form accepts a `next` parameter so a learner who is bounced to the
+login screen returns where they were going. It used to be validated inline with:
+
+    !preg_match('#^(https?:)?//#', $candidate)
+
+That rejects `//evil.example.com` and `https://evil.example.com`. It does not
+reject `/\evil.example.com`, and browsers read a slash followed by a backslash
+the same as two slashes. Posted against the running system, the server answered:
+
+    HTTP/1.1 302 Found
+    Location: /\evil.example.com/phish
+
+So a learner could sign in legitimately, with correct credentials, and land on
+somebody else's site, which is exactly the setup for a convincing credential
+phish.
+
+The fix is `auth_safe_redirect_target()` in `includes/auth.php`. It does not add
+another pattern to the blocklist, because that game is unwinnable one character
+at a time. It accepts only what it recognises as a same-site path and refuses
+everything else: any scheme, `//`, any backslash, any percent-encoded slash or
+backslash, any control character, leading whitespace, and `..`. All twenty-three
+cases are in `tests/security_test.php`, including the one that was live.
 
 ## 2. The mobile app is not a separate build
 
@@ -275,6 +376,99 @@ character budget so a long conversation cannot quietly grow the cost of every
 later message. The learner can clear their own conversation; the system's own
 audit trail of detection and generation calls is separate and stays.
 
+## 6d. What notifications say, and when
+
+`includes/notifications.php`. Nothing here calls a model, so notifications cost
+nothing. Two rules govern every write, and both matter more than the feature:
+
+1. **A notification never breaks the event that caused it.** `notify()` catches
+   everything and logs. If a learner answers eight questions and the
+   notification insert fails, the score is still recorded. Asserted in
+   `tests/notifications_test.php` by dropping the table and re-running each
+   event.
+2. **Nothing is written by a page render**, only by the action that caused the
+   event. A write on render would add a row every time anybody refreshed, and
+   the unread count would climb on its own.
+
+Four events write a notification, each from inside the function that already
+performs it:
+
+| Event | Written by | Type |
+|---|---|---|
+| A document finished being read and chunked | `resource_process()` | `material_ready` |
+| Topic detection added topics | `topics_detect()` | `topics_found` |
+| A topic crossed into the mastered band | `mastery_recalculate()` | `topic_mastered` |
+| The recommended topic changed | `recommendation_refresh()` | `recommendation` |
+
+Three of those fire on a change rather than on every call, because the last two
+functions run after every finished attempt:
+
+- `topic_mastered` compares the band it is about to write against
+  `topic_progress.weakness_priority`, which holds the band written last time.
+  Only the transition into `mastered` notifies. A topic that falls out of the
+  band and climbs back notifies again, which is correct: it is news twice.
+- `recommendation` compares the new target against the topic of the previous
+  live recommendation. A fresh recommendation row is still written every time,
+  as before; only a changed target notifies.
+- `topics_found` fires only when detection actually inserted something, so
+  re-running it on an already-detected document is silent.
+
+There is no notification-preferences table and no toggles in Settings. Rather
+than ship a switch that changes nothing, there is no switch. All four events are
+always recorded, and nothing is emailed. If the storyboard toggles are wanted,
+they belong in Chapter V as future work.
+
+## 6e. Withdrawing: export and delete
+
+Chapter III promises a participant can withdraw and take their data with them.
+Settings implements both, and neither needs the project team:
+
+- **Export my data** posts to `app/actions/export_data.php` and downloads one
+  JSON file: account, materials, topics with their mastery scores, attempts, and
+  every answer with whether it was marked correct. The password hash is
+  deliberately absent, and the uploaded files are not included because the
+  learner already holds those.
+- **Delete my account** requires the learner to type their own email address.
+  One `DELETE` on `user` cascades through every table; the uploaded files are
+  unlinked from disk first, while there is still a row pointing at them.
+  `tests/settings_test.php` proves it removes every row for that learner and not
+  one row belonging to anybody else.
+
+## 6f. Profile pictures
+
+`includes/avatar.php`. A learner uploads one image; a learner who has not gets
+their initials. It is the only place in EduFlex where a learner's own file is
+handed back to a browser, which is why it is treated carefully.
+
+- **The type is decided by reading the file**, never from its name. The
+  extension written to disk comes from the detected type, so `shell.php`
+  containing a real PNG is stored as a `.png`, and `portrait.png` containing PHP
+  is refused.
+- **`getimagesize()` is not enough on its own**, and this is worth knowing.
+  Given a file that opens with the 8-byte PNG signature and continues with
+  arbitrary bytes, it reports a perfectly good `image/png` and reads the
+  "dimensions" out of whatever followed. A PHP script with a PNG signature glued
+  to the front came back as `image/png`, 1752113186 by 1885436268 pixels. So
+  `avatar_header_is_intact()` parses the header properly as well: for a PNG that
+  means verifying the IHDR chunk's own CRC32, which no payload satisfies by
+  accident. `tests/avatar_test.php` includes a polyglot with a plausible 64 by 64
+  size, so it is the CRC doing the work and not the dimension bounds.
+- **The file is never served by Apache.** It lands in `storage/avatars/`, which
+  `storage/.htaccess` denies, and reaches a page only through
+  `app/actions/avatar_show.php`, which streams it with a Content-Type taken from
+  the detected type plus `nosniff`.
+- **That endpoint takes no user id.** It serves the session's own picture, so
+  there is no parameter to tamper with and no ownership check to get wrong.
+  Nothing in EduFlex shows one learner another learner's picture.
+- Replacing a picture deletes the old file, and deleting an account deletes the
+  picture along with everything else.
+
+Not re-encoded through GD, which would be the stronger treatment because it
+strips anything hiding alongside the image data. The GD extension is not enabled
+on the development machine, and shipping an untested branch that would start
+running the moment somebody enabled it is the worse trade. Recorded as optional
+future hardening in `docs/week7-hardening.md`.
+
 ## 7. What was deliberately left out
 
 These appear in the original storyboard but are not in the 34-module program
@@ -293,7 +487,7 @@ If you want any of them back, they are additive. Say which and it goes in.
 
 ## 8. Regenerating the app pages
 
-The nine app pages share one shell. Edit `SHELL` or a page body inside
+The eleven app pages share one shell. Edit `SHELL` or a page body inside
 `build_pages.py`, then:
 
     python3 build_pages.py

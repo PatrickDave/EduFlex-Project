@@ -46,6 +46,18 @@ check('keeps the content',              str_contains($r['text'], 'Nyquist criter
 
 section('Word documents');
 
+/* Building the fixture needs the zip extension, and so does DOCX extraction
+   itself: extract_from_docx() throws without it. Rather than crash the whole
+   suite on a PHP build where `extension=zip` is commented out, say plainly
+   that this part was not covered, and carry on. If you see this line, enable
+   extension=zip in php.ini, because DOCX uploads will fail at runtime too. */
+if (!class_exists('ZipArchive')) {
+    echo "  SKIP  DOCX extraction: the PHP zip extension is not enabled.\n";
+    echo "        DOCX uploads will fail at runtime too. Enable extension=zip in php.ini.\n";
+    $skippedDocx = true;
+} else {
+$skippedDocx = false;
+
 $docx = "$tmp/reviewer.docx";
 $zip  = new ZipArchive();
 $zip->open($docx, ZipArchive::CREATE | ZipArchive::OVERWRITE);
@@ -70,9 +82,12 @@ check('reports the docx engine',        $r['engine'] === 'docx');
 check('extracts paragraph text',        str_contains($r['text'], 'Fourier series decomposition'));
 check('separates paragraphs',           substr_count($r['text'], "\n") > 5);
 check('strips the XML tags',            !str_contains($r['text'], '<w:'));
+}
 
 section('Corrupted archive');
 
+/* A corrupt .docx must be rejected either way: with the zip extension because
+   the archive will not open, without it because extract_from_docx() throws. */
 $broken = "$tmp/broken.docx";
 file_put_contents($broken, "PK\x03\x04this is not a real archive");
 $r = extract_text($broken, 'docx');

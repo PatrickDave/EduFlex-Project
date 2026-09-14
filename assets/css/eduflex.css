@@ -372,27 +372,53 @@ p { margin: 0; }
   color: var(--ef-text-muted); text-transform: uppercase;
 }
 
-.ef-nav { display: flex; flex-direction: column; gap: 4px; }
+.ef-nav { display: flex; flex-direction: column; gap: 2px; }
 .ef-nav-item {
   display: flex; align-items: center; gap: 12px;
-  padding: 11px 12px;
-  border-radius: var(--ef-r-md);
+  padding: 10px 12px;
+  /* A softer pill than the rest of the interface. The nav is the one place a
+     row is selected rather than pressed, and the wider radius reads as a
+     highlight instead of a button. */
+  border-radius: 10px;
   font-size: 13.5px; font-weight: 500;
+  line-height: 1.35;
   color: var(--ef-text-2);
-  transition: background .15s ease;
+  transition: background .15s ease, color .15s ease;
 }
+
+/* The icon box. Fixed size so a label that wraps to two lines keeps its icon
+   aligned with the first line rather than centred against both. */
 .ef-nav-item .ef-nav-ico {
-  width: 17px; height: 17px; border-radius: 5px;
-  background: var(--ef-text-muted);
+  width: 18px; height: 18px;
   flex: 0 0 auto;
+  display: grid; place-items: center;
+  align-self: flex-start;
+  margin-top: 1px;
+  color: var(--ef-text-muted);
+  transition: color .15s ease;
 }
-.ef-nav-item:hover { background: var(--ef-surface-subtle); }
+/* stroke="currentColor" on the SVG means the icon follows this colour, so the
+   active and hover states need no separate icon rule. */
+.ef-nav-item .ef-nav-ico svg { width: 100%; height: 100%; display: block; }
+
+.ef-nav-label { min-width: 0; }
+
+.ef-nav-item:hover { background: var(--ef-surface-subtle); color: var(--ef-text); }
+.ef-nav-item:hover .ef-nav-ico { color: var(--ef-text-2); }
+
 .ef-nav-item.is-active {
   background: var(--ef-surface-sky);
   color: var(--ef-primary);
   font-weight: 600;
 }
-.ef-nav-item.is-active .ef-nav-ico { background: var(--ef-primary); }
+.ef-nav-item.is-active .ef-nav-ico { color: var(--ef-primary); }
+
+/* Keyboard focus has to be visible: the hover colour alone never appears for
+   somebody tabbing through the nav. */
+.ef-nav-item:focus-visible {
+  outline: 2px solid var(--ef-primary);
+  outline-offset: -2px;
+}
 
 .ef-sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
 .ef-sidebar-foot .ef-btn { margin-bottom: 8px; }
@@ -423,16 +449,60 @@ p { margin: 0; }
   border: 0; background: transparent; outline: none;
   font-size: 12.5px; width: 100%; color: var(--ef-text);
 }
+/* The avatar is one of two things: an <img> of the learner's uploaded picture,
+   or a <span> of their initials. Both carry .ef-avatar, so every size and shape
+   rule is written once and the two cannot drift apart. */
 .ef-avatar {
   width: 30px; height: 30px; border-radius: 50%;
   background: var(--ef-primary-bright); flex: 0 0 auto;
+  /* object-fit keeps a non-square photo from being stretched into an oval. */
+  object-fit: cover;
+  display: grid; place-items: center;
+  overflow: hidden;
 }
+.ef-avatar-initials {
+  color: var(--ef-on-primary);
+  font-size: 11.5px; font-weight: 700;
+  letter-spacing: .02em;
+  /* Initials are decorative next to a visible name, so they should not be read
+     out as a word by a screen reader. */
+  user-select: none;
+}
+.ef-avatar-link { display: inline-flex; border-radius: 50%; }
+.ef-avatar-link:focus-visible {
+  outline: 2px solid var(--ef-primary);
+  outline-offset: 2px;
+}
+
+/* The large rendering on Profile Settings. */
+.ef-avatar-xl {
+  width: 84px; height: 84px;
+  font-size: 28px;
+  border: 3px solid var(--ef-surface);
+  box-shadow: var(--ef-shadow-sm);
+}
+.ef-avatar-edit {
+  display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap;
+}
+.ef-avatar-edit-main { flex: 1 1 240px; min-width: 0; }
 .ef-icon-btn {
   width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center;
   border: 0; background: transparent; cursor: pointer; color: var(--ef-text-2);
 }
 .ef-icon-btn:hover { background: var(--ef-surface-subtle); }
+
+/* Unread badge on the topbar bell. The count itself is rendered only when it
+   is above zero, so there is no empty-dot state to style. */
+.ef-bell { position: relative; }
+.ef-bell-count {
+  position: absolute; top: 1px; right: 0;
+  min-width: 15px; height: 15px; padding: 0 4px;
+  border-radius: var(--ef-r-pill);
+  background: var(--ef-weak); color: #fff;
+  font-size: 9.5px; font-weight: 700; line-height: 15px;
+  text-align: center;
+}
 
 .ef-content { padding: 26px 28px; flex: 1 1 auto; }
 
@@ -749,6 +819,19 @@ p { margin: 0; }
 .ef-list-main { flex: 1 1 auto; min-width: 0; }
 .ef-list-title { font-size: 13.5px; font-weight: 600; }
 .ef-list-meta { font-size: 11.5px; color: var(--ef-text-muted); margin-top: 2px; }
+
+/* A notification row is a list row whose contents stack, because the message
+   is a sentence rather than a label. Unread rows carry a left edge, which is
+   the only difference the learner needs to see. */
+.ef-list-row.ef-notif { align-items: flex-start; }
+.ef-list-row.ef-notif.is-unread {
+  border-left: 3px solid var(--ef-primary);
+  background: var(--ef-surface-sky);
+}
+.ef-notif-body { font-size: 12.5px; color: var(--ef-text-2); margin-top: 6px; line-height: 1.6; }
+.ef-notif-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
 
 .ef-table { width: 100%; border-collapse: collapse; }
 .ef-table th {

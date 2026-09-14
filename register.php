@@ -132,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <span>
       <a href="#">Privacy Policy</a>
       <a href="#">Terms of Service</a>
-      <a href="#">Contact Support</a>
+      <a href="app/support.php">Contact Support</a>
     </span>
   </footer>
 </div>

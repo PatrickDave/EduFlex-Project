@@ -5,7 +5,7 @@
 set -u
 PHP="${PHP:-php}"
 fail=0
-for suite in tests/auth_test.php tests/extract_test.php tests/ai_test.php tests/questions_test.php tests/attempts_test.php tests/chat_test.php; do
+for suite in tests/auth_test.php tests/extract_test.php tests/ai_test.php tests/questions_test.php tests/attempts_test.php tests/chat_test.php tests/notifications_test.php tests/support_test.php tests/settings_test.php tests/security_test.php tests/avatar_test.php; do
   echo ""
   "$PHP" "$suite" || fail=1
 done

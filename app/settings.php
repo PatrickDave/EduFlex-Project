@@ -10,6 +10,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/stats.php';
+require_once __DIR__ . '/../includes/avatar.php';
 auth_require_login();
 
 $user   = auth_user();
@@ -41,6 +42,17 @@ $stage = stats_stage($uid);
 $ok    = flash_get('profile_ok');
 $err   = flash_get('profile_error');
 $since = date('F Y', strtotime((string) $user['created_at']));
+
+/* Password, export and delete each report through their own flash key, so a
+   failed deletion does not look like a failed profile save. */
+$passwordOk  = flash_get('password_ok');
+$passwordErr = flash_get('password_error');
+$exportErr   = flash_get('export_error');
+$deleteErr   = flash_get('delete_error');
+$avatarOk    = flash_get('avatar_ok');
+$avatarErr   = flash_get('avatar_error');
+
+$hasAvatar = avatar_has($uid);
 ?>
       <div class="ef-content">
 
@@ -53,16 +65,70 @@ $since = date('F Y', strtotime((string) $user['created_at']));
 
         <?php if ($ok): ?><div class="ef-alert ef-alert-ok"><?= e((string) $ok) ?></div><?php endif; ?>
         <?php if ($err): ?><div class="ef-alert ef-alert-error"><?= e((string) $err) ?></div><?php endif; ?>
+        <?php if ($passwordOk): ?><div class="ef-alert ef-alert-ok"><?= e((string) $passwordOk) ?></div><?php endif; ?>
+        <?php if ($passwordErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $passwordErr) ?></div><?php endif; ?>
+        <?php if ($exportErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $exportErr) ?></div><?php endif; ?>
+        <?php if ($deleteErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $deleteErr) ?></div><?php endif; ?>
+        <?php if ($avatarOk): ?><div class="ef-alert ef-alert-ok"><?= e((string) $avatarOk) ?></div><?php endif; ?>
+        <?php if ($avatarErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $avatarErr) ?></div><?php endif; ?>
 
         <div class="ef-row">
           <div class="ef-col ef-stack">
+
+            <!-- Profile picture. Its own form, because a file upload needs
+                 enctype="multipart/form-data" and the details form below does
+                 not; nesting forms is not allowed, and one combined form would
+                 re-post the whole profile every time somebody changed a photo. -->
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:6px;">Profile picture</div>
+              <div class="ef-card-sub" style="margin-bottom:18px;">
+                Shown in the top bar and here. Only you ever see it: EduFlex never
+                displays one learner's picture to another.
+              </div>
+
+              <div class="ef-avatar-edit">
+                <?= avatar_html($uid, (string) $user['full_name'], 'ef-avatar-xl') ?>
+
+                <div class="ef-avatar-edit-main">
+                  <form action="actions/save_avatar.php" method="post"
+                        enctype="multipart/form-data">
+                    <?= csrf_field() ?>
+                    <div class="ef-field" style="margin-bottom:12px;">
+                      <label class="ef-label" for="avatar">
+                        Choose an image
+                        <span class="ef-muted">JPEG, PNG, GIF or WebP, up to 3 MB</span>
+                      </label>
+                      <input class="ef-input" type="file" id="avatar" name="avatar"
+                             accept="image/jpeg,image/png,image/gif,image/webp" required>
+                    </div>
+                    <button class="ef-btn ef-btn-primary" type="submit">
+                      <?= $hasAvatar ? 'Replace picture' : 'Upload picture' ?>
+                    </button>
+                  </form>
+
+                  <?php if ($hasAvatar): ?>
+                    <form action="actions/delete_avatar.php" method="post"
+                          style="margin-top:10px;">
+                      <?= csrf_field() ?>
+                      <button class="ef-btn ef-btn-ghost ef-btn-sm" type="submit">
+                        Remove picture
+                      </button>
+                    </form>
+                  <?php else: ?>
+                    <p class="ef-muted" style="font-size:11.5px;margin-top:10px;line-height:1.6;">
+                      Until you upload one, EduFlex shows your initials.
+                    </p>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </section>
 
             <form class="ef-card ef-card-lg" action="actions/save_profile.php" method="post">
               <?= csrf_field() ?>
               <div class="ef-card-title" style="margin-bottom:18px;">Personal details</div>
 
               <div style="display:flex;align-items:center;gap:16px;margin-bottom:22px;">
-                <span class="ef-avatar" style="width:64px;height:64px;"></span>
+                <?= avatar_html($uid, (string) $user['full_name'], '', 'width:64px;height:64px;font-size:20px;') ?>
                 <div>
                   <div style="font-size:16px;font-weight:600;"><?= e((string) $user['full_name']) ?></div>
                   <div class="ef-list-meta">Member since <?= e($since) ?></div>
@@ -108,6 +174,47 @@ $since = date('F Y', strtotime((string) $user['created_at']));
               <button class="ef-btn ef-btn-primary" type="submit" style="margin-top:20px;">Save Changes</button>
             </form>
 
+            <!-- Change password -->
+            <form class="ef-card ef-card-lg" action="actions/change_password.php" method="post">
+              <?= csrf_field() ?>
+              <div class="ef-card-title" style="margin-bottom:6px;">Change password</div>
+              <div class="ef-card-sub" style="margin-bottom:18px;">
+                Your current password is checked first, so a password cannot be changed
+                from a session somebody else has got hold of. At least
+                <?= (int) AUTH_PASSWORD_MIN ?> characters.
+              </div>
+
+              <div class="row g-3">
+                <div class="col-12">
+                  <div class="ef-field" style="margin-bottom:0;">
+                    <label class="ef-label" for="current_password">Current password</label>
+                    <input class="ef-input" id="current_password" name="current_password"
+                           type="password" autocomplete="current-password" required>
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="ef-field" style="margin-bottom:0;">
+                    <label class="ef-label" for="new_password">New password</label>
+                    <input class="ef-input" id="new_password" name="new_password"
+                           type="password" autocomplete="new-password"
+                           minlength="<?= (int) AUTH_PASSWORD_MIN ?>" required>
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="ef-field" style="margin-bottom:0;">
+                    <label class="ef-label" for="confirm_password">Confirm new password</label>
+                    <input class="ef-input" id="confirm_password" name="confirm_password"
+                           type="password" autocomplete="new-password"
+                           minlength="<?= (int) AUTH_PASSWORD_MIN ?>" required>
+                  </div>
+                </div>
+              </div>
+
+              <button class="ef-btn ef-btn-primary" type="submit" style="margin-top:20px;">
+                Change password
+              </button>
+            </form>
+
             <section class="ef-card ef-card-lg">
               <div class="ef-card-title" style="margin-bottom:6px;">Your data</div>
               <div class="ef-card-sub" style="margin-bottom:16px;">
@@ -116,8 +223,57 @@ $since = date('F Y', strtotime((string) $user['created_at']));
                 <?= (int) $stage['scored_items'] ?> scored answer<?= $stage['scored_items'] === 1 ? '' : 's' ?>
                 stored against this account.
               </div>
-              <a class="ef-btn ef-btn-ghost" href="companion.php">Manage materials</a>
+
+              <p class="ef-second" style="font-size:12.5px;line-height:1.6;margin-bottom:16px;">
+                The export is a single JSON file holding your account details, your
+                materials list, every topic with its mastery score, and every answer you
+                have given with whether it was marked correct. The uploaded files
+                themselves are not included, since you already have those.
+              </p>
+
+              <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <form action="actions/export_data.php" method="post" style="margin:0;">
+                  <?= csrf_field() ?>
+                  <button class="ef-btn ef-btn-primary" type="submit">Export my data</button>
+                </form>
+                <a class="ef-btn ef-btn-ghost" href="companion.php">Manage materials</a>
+              </div>
             </section>
+
+            <!-- Delete account. Chapter III promises a participant can withdraw
+                 and remove their data; this is that promise. -->
+            <form class="ef-card ef-card-lg" action="actions/delete_account.php" method="post">
+              <?= csrf_field() ?>
+              <div class="ef-card-title" style="margin-bottom:6px;color:var(--ef-weak);">
+                Delete my account
+              </div>
+              <div class="ef-card-sub" style="margin-bottom:16px;">
+                This cannot be undone, and the project team cannot restore it for you.
+              </div>
+
+              <p class="ef-second" style="font-size:12.5px;line-height:1.6;margin-bottom:16px;">
+                Deleting removes your account, your uploaded files, the text extracted
+                from them, every topic and mastery score, every practice attempt and
+                answer, your conversations with the companion, your notifications and
+                your support requests. If you are taking part in the study and want to
+                withdraw, export your data first, then delete from here. You do not have
+                to ask anybody.
+              </p>
+
+              <div class="ef-field">
+                <label class="ef-label" for="confirm_email">
+                  Type <strong><?= e((string) $user['email']) ?></strong> to confirm
+                </label>
+                <input class="ef-input" id="confirm_email" name="confirm_email" type="text"
+                       placeholder="<?= e((string) $user['email']) ?>"
+                       autocomplete="off" spellcheck="false" required>
+              </div>
+
+              <button class="ef-btn ef-btn-ghost" type="submit"
+                      style="border-color:var(--ef-weak);color:var(--ef-weak);">
+                Delete my account permanently
+              </button>
+            </form>
           </div>
 
           <div class="ef-col-fixed-360 ef-stack">

@@ -1,3 +1,19 @@
+<?php
+/**
+ * EduFlex — public landing page.
+ *
+ * The only page in the system that does not call auth_boot(), because an
+ * anonymous visitor has no reason to be given a session. It therefore has to
+ * ask for the security headers itself, and this block must stay above the
+ * doctype: a header sent after output has started is silently dropped.
+ */
+
+declare(strict_types=1);
+require_once __DIR__ . '/includes/security.php';
+
+security_harden_error_output();
+security_headers();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -193,7 +209,7 @@
   <span>
     <a href="#">Privacy Policy</a>
     <a href="#">Terms of Service</a>
-    <a href="#">Contact Support</a>
+    <a href="app/support.php">Contact Support</a>
   </span>
 </footer>
 

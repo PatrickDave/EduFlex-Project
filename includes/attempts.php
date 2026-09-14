@@ -21,6 +21,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/questions.php';
+require_once __DIR__ . '/notifications.php';
 require_once __DIR__ . '/../config/database.php';
 
 /* -------------------------------------------------------------------------
@@ -349,14 +350,23 @@ function attempt_finish(int $attemptId, int $userId): array
  * Recomputed from the full history rather than adjusted incrementally, so a
  * deleted attempt or a corrected answer can never leave the value drifting.
  *
- * @return array{mastery:float, scored_items:int, band:string, previous:float, delta:float}
+ * @return array{mastery:float, scored_items:int, band:string, previous:float,
+ *               previous_band:string, delta:float}
  */
 function mastery_recalculate(int $topicProgressId, int $userId): array
 {
-    $stmt = db()->prepare('SELECT mastery_score FROM topic_progress
+    // weakness_priority holds the band this function last wrote, so reading it
+    // here is how the transition into "mastered" is detected further down
+    // without recomputing anything.
+    $stmt = db()->prepare('SELECT mastery_score, weakness_priority, topic_name
+                             FROM topic_progress
                             WHERE topic_progress_id = ? AND user_id = ?');
     $stmt->execute([$topicProgressId, $userId]);
-    $previous = (float) ($stmt->fetchColumn() ?: 0.0);
+    $before = $stmt->fetch() ?: [];
+
+    $previous     = (float) ($before['mastery_score'] ?? 0.0);
+    $previousBand = (string) ($before['weakness_priority'] ?? 'none');
+    $topicName    = (string) ($before['topic_name'] ?? '');
 
     // Newest first, because the recency weight is defined by position.
     $stmt = db()->prepare(
@@ -394,12 +404,34 @@ function mastery_recalculate(int $topicProgressId, int $userId): array
     );
     $stmt->execute([$mastery, $scoredItems, $band, $topicProgressId, $userId]);
 
+    /* The transition into "mastered", and only the transition. This function
+       runs after every finished attempt, so notifying on each recalculation
+       would bury the learner in "you have mastered X" for a topic they
+       mastered last week. A band that drops out of mastered and climbs back
+       notifies again, which is correct: it is news the second time too. */
+    if ($band === 'mastered' && $previousBand !== 'mastered' && $topicName !== '') {
+        notify(
+            $userId,
+            'topic_mastered',
+            'You have mastered ' . mb_substr($topicName, 0, 120),
+            sprintf(
+                '%s is at %d%% across %s. That is the mastered band, which starts at %d%%. '
+                . 'EduFlex will move its attention to a weaker topic.',
+                $topicName,
+                (int) round($mastery),
+                notifications_plural($scoredItems, 'scored answer'),
+                (int) MASTERY_MASTERED_AT
+            )
+        );
+    }
+
     return [
-        'mastery'      => $mastery,
-        'scored_items' => $scoredItems,
-        'band'         => $band,
-        'previous'     => $previous,
-        'delta'        => round($mastery - $previous, 2),
+        'mastery'       => $mastery,
+        'scored_items'  => $scoredItems,
+        'band'          => $band,
+        'previous'      => $previous,
+        'previous_band' => $previousBand,
+        'delta'         => round($mastery - $previous, 2),
     ];
 }
 
@@ -462,6 +494,16 @@ function recommendation_refresh(int $userId): array
             $band
         );
 
+        /* What the learner was last pointed at. Read before the supersede, so
+           the notification below can tell a genuinely new recommendation from
+           the same one restated. */
+        $find = db()->prepare("SELECT topic_progress_id FROM recommendation
+                                WHERE user_id = ? AND status IN ('new','viewed')
+                             ORDER BY recommendation_id DESC LIMIT 1");
+        $find->execute([$userId]);
+        $previousTopicId = $find->fetchColumn();
+        $previousTopicId = $previousTopicId === false ? null : (int) $previousTopicId;
+
         db()->prepare("UPDATE recommendation SET status = 'superseded'
                         WHERE user_id = ? AND status IN ('new','viewed')")
             ->execute([$userId]);
@@ -481,9 +523,25 @@ function recommendation_refresh(int $userId): array
             'new',
         ]);
 
+        $recommendationId = (int) db()->lastInsertId();
+
+        /* Only when the target has actually moved. This function runs after
+           every finished attempt and writes a fresh row each time, so
+           notifying on every insert would produce one "practise X next" per
+           attempt for the same X. The same rule as topic_mastered: tell the
+           learner what changed, not what was recalculated. */
+        if ($previousTopicId !== $topicId) {
+            notify(
+                $userId,
+                'recommendation',
+                'Practise ' . mb_substr((string) $weakest['topic_name'], 0, 120) . ' next',
+                $reason . ' The next set will be at the ' . $level . ' level.'
+            );
+        }
+
         return [
             'ok'                => true,
-            'recommendation_id' => (int) db()->lastInsertId(),
+            'recommendation_id' => $recommendationId,
             'topic'             => (string) $weakest['topic_name'],
             'reason'            => $reason,
         ];

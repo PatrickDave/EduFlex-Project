@@ -39,6 +39,21 @@ $title  = 'Materials Library';
 <?php
 $resources = resource_list((int) $user['user_id']);
 $totals    = resource_totals((int) $user['user_id']);
+
+/* The topbar search box submits here. Filtering the already-fetched list in
+   PHP rather than adding a second query keeps resource_list() as the one place
+   materials are read from, and a learner has tens of files, not thousands. */
+$query = trim((string) ($_GET['q'] ?? ''));
+if ($query !== '') {
+    $needle    = mb_strtolower($query);
+    $resources = array_values(array_filter(
+        $resources,
+        static fn(array $r): bool =>
+            str_contains(mb_strtolower((string) $r['title']), $needle)
+         || str_contains(mb_strtolower((string) $r['original_name']), $needle)
+    ));
+}
+
 $topicCounts = [];
 foreach ($resources as $r) {
     $topicCounts[(int) $r['resource_id']] = topics_count_for_resource(
@@ -103,11 +118,28 @@ $processId  = flash_get('materials_process');
               <div class="ef-card-head">
                 <div class="ef-card-title">Your materials</div>
                 <span class="ef-muted" style="font-size:11.5px;">
-                  <?= (int) $totals['files'] ?> file<?= $totals['files'] === 1 ? '' : 's' ?>
+                  <?php if ($query !== ''): ?>
+                    <?= count($resources) ?> of <?= (int) $totals['files'] ?> matching
+                    &ldquo;<?= e($query) ?>&rdquo;
+                    &middot; <a href="materials.php">clear</a>
+                  <?php else: ?>
+                    <?= (int) $totals['files'] ?> file<?= $totals['files'] === 1 ? '' : 's' ?>
+                  <?php endif; ?>
                 </span>
               </div>
 
-              <?php if (!$resources): ?>
+              <?php if (!$resources && $query !== ''): ?>
+                <div class="ef-empty-state">
+                  <div class="ef-empty-ico"></div>
+                  <h5>No material matches that</h5>
+                  <p>
+                    Nothing in your library has &ldquo;<?= e($query) ?>&rdquo; in its title
+                    or file name. The search looks at names only, not at the text inside
+                    your documents; ask the companion if you want to search the content.
+                  </p>
+                  <a class="ef-btn ef-btn-ghost" href="materials.php">Show all materials</a>
+                </div>
+              <?php elseif (!$resources): ?>
                 <div class="ef-empty-state">
                   <div class="ef-empty-ico"></div>
                   <h5>Nothing uploaded yet</h5>

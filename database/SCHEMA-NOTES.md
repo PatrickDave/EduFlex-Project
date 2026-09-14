@@ -1,6 +1,6 @@
 # Schema notes
 
-`01_schema.sql` follows the Chapter III data dictionary (Tables 4 to 15). Five
+`01_schema.sql` follows the Chapter III data dictionary (Tables 4 to 15). Seven
 things differ, and Chapter III should be amended to match before your final
 defense. Each one is a gap in the documented design, not a preference.
 
@@ -67,6 +67,58 @@ in Chapter III without digging through code.
 
 This is optional. If your panel objects to a table outside the ERD, move the
 weights into a PHP constant instead. Do not scatter them across both.
+
+## 6. `login_attempt` table — ADDED
+
+Not in your ERD. One row per **failed** sign-in attempt, holding the email tried,
+the address it came from, and when.
+
+Without it the login form accepts unlimited password guesses at whatever rate
+the network allows, which is the only thing standing between a weak password and
+an account. `includes/security.php` refuses an email and address pair after
+five failures in fifteen minutes, and refuses an address entirely after twenty
+failures across any emails, which is what stops one attacker spraying a single
+common password across many accounts.
+
+Three design points a panelist may ask about, all deliberate:
+
+1. **No foreign key to `user`.** Attempts against an email that does not exist
+   must be counted too. If they were not, the throttle would itself answer the
+   question "is this email registered?": unlimited guesses at an unknown
+   address, five at a real one.
+2. **Only failures are stored, and a successful login deletes the rows for that
+   email and address.** A learner who mistypes four times and then gets it right
+   is not punished, and the table holds no record of anybody's successful
+   sign-ins, which would be a log of when each participant was studying.
+3. **Pruned on each successful login**, not by a scheduled job, because this
+   project has no scheduler. Rows outside the window are deleted then, so the
+   table stays small on its own.
+
+If your panel objects to a table outside the ERD, the alternative is no rate
+limiting, and that is a worse answer. The table is cheap to describe: three
+columns and two indexes.
+
+## 7. `user.avatar_path` -- ADDED
+
+One nullable VARCHAR(255) on `user`, holding the path to that learner's profile
+picture relative to the project root, or NULL when they have not set one.
+
+The storyboard's profile screen shows an avatar, so the screen was already
+drawing one; until now it was a coloured circle that never changed. A learner
+can now upload a real picture, and a learner who has not gets their initials.
+
+Two questions a panelist might ask:
+
+1. **Why a column rather than a filename derived from the user id?** Because
+   `01_schema.sql` starts with `DROP DATABASE`, so ids restart at 1 on every
+   reimport while old files stay on disk. A derived name would hand the next
+   user 1 the previous user 1's photograph. The stored path carries 12 random
+   bytes, so it cannot collide across reimports.
+2. **Why is the file not in the web root?** It goes to `storage/avatars/`, which
+   `storage/.htaccess` denies Apache from serving or executing, and reaches a
+   page only through `app/actions/avatar_show.php`. That endpoint takes no user
+   id at all: it serves the session's own picture, so there is no parameter for
+   anybody to change. See README section 6f.
 
 ---
 

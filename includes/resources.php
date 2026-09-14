@@ -18,6 +18,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/extract.php';
+require_once __DIR__ . '/notifications.php';
 
 /** Where uploaded files are written. Kept out of the web root by .htaccess. */
 function storage_dir(): string
@@ -185,7 +186,7 @@ function upload_content_matches(string $path, string $extension): bool
 function resource_process(int $resourceId, int $userId): array
 {
     $stmt = db()->prepare(
-        'SELECT resource_id, storage_path, file_type
+        'SELECT resource_id, title, storage_path, file_type
            FROM learning_resource
           WHERE resource_id = ? AND user_id = ? LIMIT 1'
     );
@@ -248,6 +249,22 @@ function resource_process(int $resourceId, int $userId): array
         return ['ok' => false, 'status' => STATUS_FAILED,
                 'message' => 'Could not store the extracted text.', 'chunks' => 0, 'chars' => 0];
     }
+
+    // Written after the commit, so the notification describes a stored fact.
+    // notify() never throws, so this cannot turn a successful read into a
+    // failure; see the rules at the top of includes/notifications.php.
+    notify(
+        $userId,
+        'material_ready',
+        'EduFlex has read ' . mb_substr((string) $resource['title'], 0, 120),
+        sprintf(
+            'The text was extracted and stored as %d section%s, %s characters in all. '
+            . 'Run topic detection on it and EduFlex can start building practice sets.',
+            count($chunks),
+            count($chunks) === 1 ? '' : 's',
+            number_format((int) $result['chars'])
+        )
+    );
 
     return [
         'ok'      => true,

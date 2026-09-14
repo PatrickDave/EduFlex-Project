@@ -218,10 +218,26 @@ Open a terminal in the project folder:
     C:\xampp\php\php.exe tests\questions_test.php
     C:\xampp\php\php.exe tests\attempts_test.php
     C:\xampp\php\php.exe tests\chat_test.php
+    C:\xampp\php\php.exe tests\notifications_test.php
+    C:\xampp\php\php.exe tests\support_test.php
+    C:\xampp\php\php.exe tests\settings_test.php
+    C:\xampp\php\php.exe tests\security_test.php
+    C:\xampp\php\php.exe tests\avatar_test.php
 
-Expect `Passed: 40`, `32`, `63`, `73`, `81` and `69`, all with `Failed: 0`, for
-358 checks in total. On Mac or Linux, `./run_tests.sh` runs all six. None needs
-a database, a web server, an API key or an internet connection.
+Expect `Passed: 40`, `32`, `63`, `73`, `81`, `69`, `77`, `39`, `60`, `79` and
+`87`, all with `Failed: 0`, for 700 checks in total. On Mac or Linux,
+`./run_tests.sh` runs all eleven. None needs a database, a web server, an API key
+or an internet connection.
+
+One exception to that. 5 of the 32 extraction checks build a .docx fixture,
+which needs PHP's `zip` extension. If you see
+
+    SKIP  DOCX extraction: the PHP zip extension is not enabled.
+
+then open `C:\xampp\php\php.ini`, find the line `;extension=zip`, remove the
+leading semicolon, and restart Apache. The suite passes either way, but without
+that extension **every DOCX upload fails at runtime as well**, so fix it now
+rather than during a defense. Expect `Passed: 27` until you do.
 
 `tests/attempts_test.php` is the one to point a panel at. It contains the
 mastery arithmetic worked out by hand: that a recent correct answer scores
@@ -234,6 +250,18 @@ proves the grounding rules: that a question the material does not answer is
 refused rather than filled in from the model's own knowledge, that a citation to
 a passage the model was never given is discarded, and that one learner can never
 read another learner's conversation.
+
+`tests/settings_test.php` is the one to point a panel at on research ethics. It
+proves that a participant can withdraw: that Delete my account removes every row
+belonging to that learner, across every table that holds their data, and not one
+row belonging to anybody else. It runs with SQLite foreign keys switched on, so
+the cascade is really exercised rather than assumed.
+
+`tests/security_test.php` is the one to point a panel at on hardening. Its first
+block is a table of twenty-three redirect destinations and whether each is
+followed, including `/\evil.example.com/phish`, which the previous check let
+through and which really did produce an off-site `Location` header on the running
+system. See README section 1c for the account of it.
 
 There are also two browser tests, which need a running Apache and MySQL and
 `pip install playwright`:

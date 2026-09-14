@@ -3,7 +3,7 @@
 Generates the EduFlex app pages from a single shell template.
 
 Every page shares one sidebar and one topbar. Editing the shell here and
-re-running this script keeps all eight pages in sync. When you move to PHP,
+re-running this script keeps all eleven pages in sync. When you move to PHP,
 replace SHELL with partials/sidebar.php + partials/topbar.php includes and
 delete this script.
 
@@ -1192,6 +1192,21 @@ $overallBand = $overall === null ? 'none' : mastery_band($overall, MASTERY_MIN_I
 MATERIALS = '''<?php
 $resources = resource_list((int) $user['user_id']);
 $totals    = resource_totals((int) $user['user_id']);
+
+/* The topbar search box submits here. Filtering the already-fetched list in
+   PHP rather than adding a second query keeps resource_list() as the one place
+   materials are read from, and a learner has tens of files, not thousands. */
+$query = trim((string) ($_GET['q'] ?? ''));
+if ($query !== '') {
+    $needle    = mb_strtolower($query);
+    $resources = array_values(array_filter(
+        $resources,
+        static fn(array $r): bool =>
+            str_contains(mb_strtolower((string) $r['title']), $needle)
+         || str_contains(mb_strtolower((string) $r['original_name']), $needle)
+    ));
+}
+
 $topicCounts = [];
 foreach ($resources as $r) {
     $topicCounts[(int) $r['resource_id']] = topics_count_for_resource(
@@ -1256,11 +1271,28 @@ $processId  = flash_get('materials_process');
               <div class="ef-card-head">
                 <div class="ef-card-title">Your materials</div>
                 <span class="ef-muted" style="font-size:11.5px;">
-                  <?= (int) $totals['files'] ?> file<?= $totals['files'] === 1 ? '' : 's' ?>
+                  <?php if ($query !== ''): ?>
+                    <?= count($resources) ?> of <?= (int) $totals['files'] ?> matching
+                    &ldquo;<?= e($query) ?>&rdquo;
+                    &middot; <a href="materials.php">clear</a>
+                  <?php else: ?>
+                    <?= (int) $totals['files'] ?> file<?= $totals['files'] === 1 ? '' : 's' ?>
+                  <?php endif; ?>
                 </span>
               </div>
 
-              <?php if (!$resources): ?>
+              <?php if (!$resources && $query !== ''): ?>
+                <div class="ef-empty-state">
+                  <div class="ef-empty-ico"></div>
+                  <h5>No material matches that</h5>
+                  <p>
+                    Nothing in your library has &ldquo;<?= e($query) ?>&rdquo; in its title
+                    or file name. The search looks at names only, not at the text inside
+                    your documents; ask the companion if you want to search the content.
+                  </p>
+                  <a class="ef-btn ef-btn-ghost" href="materials.php">Show all materials</a>
+                </div>
+              <?php elseif (!$resources): ?>
                 <div class="ef-empty-state">
                   <div class="ef-empty-ico"></div>
                   <h5>Nothing uploaded yet</h5>
@@ -1527,6 +1559,17 @@ $stage = stats_stage($uid);
 $ok    = flash_get('profile_ok');
 $err   = flash_get('profile_error');
 $since = date('F Y', strtotime((string) $user['created_at']));
+
+/* Password, export and delete each report through their own flash key, so a
+   failed deletion does not look like a failed profile save. */
+$passwordOk  = flash_get('password_ok');
+$passwordErr = flash_get('password_error');
+$exportErr   = flash_get('export_error');
+$deleteErr   = flash_get('delete_error');
+$avatarOk    = flash_get('avatar_ok');
+$avatarErr   = flash_get('avatar_error');
+
+$hasAvatar = avatar_has($uid);
 ?>
       <div class="ef-content">
 
@@ -1539,16 +1582,70 @@ $since = date('F Y', strtotime((string) $user['created_at']));
 
         <?php if ($ok): ?><div class="ef-alert ef-alert-ok"><?= e((string) $ok) ?></div><?php endif; ?>
         <?php if ($err): ?><div class="ef-alert ef-alert-error"><?= e((string) $err) ?></div><?php endif; ?>
+        <?php if ($passwordOk): ?><div class="ef-alert ef-alert-ok"><?= e((string) $passwordOk) ?></div><?php endif; ?>
+        <?php if ($passwordErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $passwordErr) ?></div><?php endif; ?>
+        <?php if ($exportErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $exportErr) ?></div><?php endif; ?>
+        <?php if ($deleteErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $deleteErr) ?></div><?php endif; ?>
+        <?php if ($avatarOk): ?><div class="ef-alert ef-alert-ok"><?= e((string) $avatarOk) ?></div><?php endif; ?>
+        <?php if ($avatarErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $avatarErr) ?></div><?php endif; ?>
 
         <div class="ef-row">
           <div class="ef-col ef-stack">
+
+            <!-- Profile picture. Its own form, because a file upload needs
+                 enctype="multipart/form-data" and the details form below does
+                 not; nesting forms is not allowed, and one combined form would
+                 re-post the whole profile every time somebody changed a photo. -->
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:6px;">Profile picture</div>
+              <div class="ef-card-sub" style="margin-bottom:18px;">
+                Shown in the top bar and here. Only you ever see it: EduFlex never
+                displays one learner's picture to another.
+              </div>
+
+              <div class="ef-avatar-edit">
+                <?= avatar_html($uid, (string) $user['full_name'], 'ef-avatar-xl') ?>
+
+                <div class="ef-avatar-edit-main">
+                  <form action="actions/save_avatar.php" method="post"
+                        enctype="multipart/form-data">
+                    <?= csrf_field() ?>
+                    <div class="ef-field" style="margin-bottom:12px;">
+                      <label class="ef-label" for="avatar">
+                        Choose an image
+                        <span class="ef-muted">JPEG, PNG, GIF or WebP, up to 3 MB</span>
+                      </label>
+                      <input class="ef-input" type="file" id="avatar" name="avatar"
+                             accept="image/jpeg,image/png,image/gif,image/webp" required>
+                    </div>
+                    <button class="ef-btn ef-btn-primary" type="submit">
+                      <?= $hasAvatar ? 'Replace picture' : 'Upload picture' ?>
+                    </button>
+                  </form>
+
+                  <?php if ($hasAvatar): ?>
+                    <form action="actions/delete_avatar.php" method="post"
+                          style="margin-top:10px;">
+                      <?= csrf_field() ?>
+                      <button class="ef-btn ef-btn-ghost ef-btn-sm" type="submit">
+                        Remove picture
+                      </button>
+                    </form>
+                  <?php else: ?>
+                    <p class="ef-muted" style="font-size:11.5px;margin-top:10px;line-height:1.6;">
+                      Until you upload one, EduFlex shows your initials.
+                    </p>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </section>
 
             <form class="ef-card ef-card-lg" action="actions/save_profile.php" method="post">
               <?= csrf_field() ?>
               <div class="ef-card-title" style="margin-bottom:18px;">Personal details</div>
 
               <div style="display:flex;align-items:center;gap:16px;margin-bottom:22px;">
-                <span class="ef-avatar" style="width:64px;height:64px;"></span>
+                <?= avatar_html($uid, (string) $user['full_name'], '', 'width:64px;height:64px;font-size:20px;') ?>
                 <div>
                   <div style="font-size:16px;font-weight:600;"><?= e((string) $user['full_name']) ?></div>
                   <div class="ef-list-meta">Member since <?= e($since) ?></div>
@@ -1594,6 +1691,47 @@ $since = date('F Y', strtotime((string) $user['created_at']));
               <button class="ef-btn ef-btn-primary" type="submit" style="margin-top:20px;">Save Changes</button>
             </form>
 
+            <!-- Change password -->
+            <form class="ef-card ef-card-lg" action="actions/change_password.php" method="post">
+              <?= csrf_field() ?>
+              <div class="ef-card-title" style="margin-bottom:6px;">Change password</div>
+              <div class="ef-card-sub" style="margin-bottom:18px;">
+                Your current password is checked first, so a password cannot be changed
+                from a session somebody else has got hold of. At least
+                <?= (int) AUTH_PASSWORD_MIN ?> characters.
+              </div>
+
+              <div class="row g-3">
+                <div class="col-12">
+                  <div class="ef-field" style="margin-bottom:0;">
+                    <label class="ef-label" for="current_password">Current password</label>
+                    <input class="ef-input" id="current_password" name="current_password"
+                           type="password" autocomplete="current-password" required>
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="ef-field" style="margin-bottom:0;">
+                    <label class="ef-label" for="new_password">New password</label>
+                    <input class="ef-input" id="new_password" name="new_password"
+                           type="password" autocomplete="new-password"
+                           minlength="<?= (int) AUTH_PASSWORD_MIN ?>" required>
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="ef-field" style="margin-bottom:0;">
+                    <label class="ef-label" for="confirm_password">Confirm new password</label>
+                    <input class="ef-input" id="confirm_password" name="confirm_password"
+                           type="password" autocomplete="new-password"
+                           minlength="<?= (int) AUTH_PASSWORD_MIN ?>" required>
+                  </div>
+                </div>
+              </div>
+
+              <button class="ef-btn ef-btn-primary" type="submit" style="margin-top:20px;">
+                Change password
+              </button>
+            </form>
+
             <section class="ef-card ef-card-lg">
               <div class="ef-card-title" style="margin-bottom:6px;">Your data</div>
               <div class="ef-card-sub" style="margin-bottom:16px;">
@@ -1602,8 +1740,57 @@ $since = date('F Y', strtotime((string) $user['created_at']));
                 <?= (int) $stage['scored_items'] ?> scored answer<?= $stage['scored_items'] === 1 ? '' : 's' ?>
                 stored against this account.
               </div>
-              <a class="ef-btn ef-btn-ghost" href="companion.php">Manage materials</a>
+
+              <p class="ef-second" style="font-size:12.5px;line-height:1.6;margin-bottom:16px;">
+                The export is a single JSON file holding your account details, your
+                materials list, every topic with its mastery score, and every answer you
+                have given with whether it was marked correct. The uploaded files
+                themselves are not included, since you already have those.
+              </p>
+
+              <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <form action="actions/export_data.php" method="post" style="margin:0;">
+                  <?= csrf_field() ?>
+                  <button class="ef-btn ef-btn-primary" type="submit">Export my data</button>
+                </form>
+                <a class="ef-btn ef-btn-ghost" href="companion.php">Manage materials</a>
+              </div>
             </section>
+
+            <!-- Delete account. Chapter III promises a participant can withdraw
+                 and remove their data; this is that promise. -->
+            <form class="ef-card ef-card-lg" action="actions/delete_account.php" method="post">
+              <?= csrf_field() ?>
+              <div class="ef-card-title" style="margin-bottom:6px;color:var(--ef-weak);">
+                Delete my account
+              </div>
+              <div class="ef-card-sub" style="margin-bottom:16px;">
+                This cannot be undone, and the project team cannot restore it for you.
+              </div>
+
+              <p class="ef-second" style="font-size:12.5px;line-height:1.6;margin-bottom:16px;">
+                Deleting removes your account, your uploaded files, the text extracted
+                from them, every topic and mastery score, every practice attempt and
+                answer, your conversations with the companion, your notifications and
+                your support requests. If you are taking part in the study and want to
+                withdraw, export your data first, then delete from here. You do not have
+                to ask anybody.
+              </p>
+
+              <div class="ef-field">
+                <label class="ef-label" for="confirm_email">
+                  Type <strong><?= e((string) $user['email']) ?></strong> to confirm
+                </label>
+                <input class="ef-input" id="confirm_email" name="confirm_email" type="text"
+                       placeholder="<?= e((string) $user['email']) ?>"
+                       autocomplete="off" spellcheck="false" required>
+              </div>
+
+              <button class="ef-btn ef-btn-ghost" type="submit"
+                      style="border-color:var(--ef-weak);color:var(--ef-weak);">
+                Delete my account permanently
+              </button>
+            </form>
           </div>
 
           <div class="ef-col-fixed-360 ef-stack">
@@ -1629,6 +1816,366 @@ $since = date('F Y', strtotime((string) $user['created_at']));
         </div>
       </div>'''
 
+
+
+# ============================================================================
+# NOTIFICATIONS
+#
+# Read only. Nothing on this page writes a notification, because a write on
+# render would add a row every time anybody refreshed and the count would climb
+# on its own. The four events that do write are listed in the right-hand card,
+# and the rule is documented at the top of includes/notifications.php.
+# ============================================================================
+NOTIFICATIONS = '''<?php
+$uid    = (int) $user['user_id'];
+$filter = ($_GET['filter'] ?? '') === 'unread' ? 'unread' : 'all';
+$totals = notifications_totals($uid);
+$rows   = notifications_list($uid, NOTIFY_PAGE_SIZE, $filter);
+$ok     = flash_get('notifications_ok');
+$err    = flash_get('notifications_error');
+?>
+      <div class="ef-content">
+
+        <div class="ef-page-head">
+          <div>
+            <h2>Notifications</h2>
+            <p>What EduFlex has done with your material, and what it suggests next</p>
+          </div>
+          <?php if ($totals['unread'] > 0): ?>
+            <form method="post" action="actions/notifications_read.php" style="margin:0;">
+              <?= csrf_field() ?>
+              <input type="hidden" name="scope" value="all">
+              <input type="hidden" name="filter" value="<?= e($filter) ?>">
+              <button class="ef-btn ef-btn-ghost ef-btn-sm" type="submit">
+                Mark all read
+              </button>
+            </form>
+          <?php endif; ?>
+        </div>
+
+        <?php if ($ok): ?><div class="ef-alert ef-alert-ok"><?= e((string) $ok) ?></div><?php endif; ?>
+        <?php if ($err): ?><div class="ef-alert ef-alert-error"><?= e((string) $err) ?></div><?php endif; ?>
+
+        <div class="ef-row">
+          <div class="ef-col ef-stack">
+            <section class="ef-card ef-card-lg">
+
+              <div class="ef-tabs">
+                <a class="ef-tab<?= $filter === 'all' ? ' is-active' : '' ?>"
+                   href="notifications.php">
+                  All <span class="ef-tab-count"><?= (int) $totals['total'] ?></span>
+                </a>
+                <a class="ef-tab<?= $filter === 'unread' ? ' is-active' : '' ?>"
+                   href="notifications.php?filter=unread">
+                  Unread <span class="ef-tab-count"><?= (int) $totals['unread'] ?></span>
+                </a>
+              </div>
+
+              <?php if ($totals['total'] === 0): ?>
+                <div class="ef-empty-state">
+                  <div class="ef-empty-ico"></div>
+                  <h5>Nothing to report yet</h5>
+                  <p>
+                    EduFlex writes a notification when it finishes reading a document,
+                    when it works out what topics that document covers, when a topic of
+                    yours reaches the mastered band, and when it changes its mind about
+                    what you should practise next. Upload something and the first one
+                    will appear here.
+                  </p>
+                  <a class="ef-btn ef-btn-primary" href="companion.php">Open the companion</a>
+                </div>
+
+              <?php elseif (!$rows): ?>
+                <div class="ef-empty-state">
+                  <div class="ef-empty-ico"></div>
+                  <h5>Nothing unread</h5>
+                  <p>You have read all <?= (int) $totals['total'] ?> of your notifications.</p>
+                  <a class="ef-btn ef-btn-ghost" href="notifications.php">Show all</a>
+                </div>
+
+              <?php else: ?>
+                <?php foreach ($rows as $n): ?>
+                  <?php
+                    $type   = (string) $n['notification_type'];
+                    $label  = notifications_type_label($type);
+                    $unread = (int) $n['is_read'] === 0;
+                  ?>
+                  <div class="ef-list-row ef-notif<?= $unread ? ' is-unread' : '' ?>">
+                    <span class="ef-list-ico"><?= e(mb_substr($label, 0, 1)) ?></span>
+
+                    <div class="ef-list-main">
+                      <div class="ef-notif-head">
+                        <span class="ef-list-title"><?= e((string) $n['title']) ?></span>
+                        <span class="ef-band ef-band-<?= e(notifications_type_band($type)) ?>">
+                          <?= e($label) ?>
+                        </span>
+                        <span class="ef-list-meta" style="margin-top:0;">
+                          <?= e(notifications_when((string) $n['created_at'])) ?>
+                        </span>
+                      </div>
+                      <div class="ef-notif-body"><?= e((string) $n['message']) ?></div>
+                    </div>
+
+                    <?php if ($unread): ?>
+                      <form method="post" action="actions/notifications_read.php" style="margin:0;">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="notification_id"
+                               value="<?= (int) $n['notification_id'] ?>">
+                        <input type="hidden" name="filter" value="<?= e($filter) ?>">
+                        <button class="ef-btn ef-btn-ghost ef-btn-sm" type="submit">
+                          Mark read
+                        </button>
+                      </form>
+                    <?php endif; ?>
+                  </div>
+                <?php endforeach; ?>
+
+                <?php if (count($rows) >= NOTIFY_PAGE_SIZE): ?>
+                  <p class="ef-muted" style="font-size:11.5px;margin-top:14px;">
+                    Showing the most recent <?= (int) NOTIFY_PAGE_SIZE ?>.
+                  </p>
+                <?php endif; ?>
+              <?php endif; ?>
+            </section>
+          </div>
+
+          <div class="ef-col-fixed-360 ef-stack">
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:6px;">What gets reported</div>
+              <div class="ef-card-sub" style="margin-bottom:14px;">
+                Four events, all of them things you did
+              </div>
+              <ul class="ef-second" style="font-size:12.5px;line-height:1.7;padding-left:18px;margin:0;">
+                <li>A document finished being read and split into sections.</li>
+                <li>Topic detection found topics in one of your documents.</li>
+                <li>A topic of yours reached the mastered band, at
+                    <?= (int) MASTERY_MASTERED_AT ?>% or above.</li>
+                <li>EduFlex changed which topic it thinks you should practise next.</li>
+              </ul>
+              <p class="ef-muted" style="font-size:11.5px;margin-top:14px;line-height:1.6;">
+                Nothing is written when you open a page. Each of these is recorded by the
+                action that caused it, so the count only moves when something actually
+                happened.
+              </p>
+            </section>
+
+            <section class="ef-card ef-card-sky">
+              <span class="ef-eyebrow">No preferences yet</span>
+              <p class="ef-second" style="font-size:12.5px;margin-top:8px;line-height:1.6;">
+                EduFlex has no notification settings to turn on or off. Rather than show
+                you switches that do nothing, there are none. All four events above are
+                always recorded, and nothing is emailed to you.
+              </p>
+            </section>
+          </div>
+        </div>
+      </div>'''
+
+
+# ============================================================================
+# SUPPORT
+#
+# Honest about what happens next. There is no staffed helpdesk behind this
+# form: the row is stored for the project team to read. Saying otherwise would
+# be a claim the study cannot back up. The FAQ is static content, not seeded
+# tickets.
+# ============================================================================
+SUPPORT = '''<?php
+$uid      = (int) $user['user_id'];
+$ok       = flash_get('support_ok');
+$err      = flash_get('support_error');
+$errors   = flash_get('support_errors') ?: [];
+$draft    = flash_get('support_draft') ?: [];
+$requests = support_list($uid);
+
+$draftType    = (string) ($draft['request_type'] ?? '');
+$draftSubject = (string) ($draft['subject'] ?? '');
+$draftMessage = (string) ($draft['message'] ?? '');
+?>
+      <div class="ef-content">
+
+        <div class="ef-page-head">
+          <div>
+            <h2>Support</h2>
+            <p>Tell the project team what went wrong, and see what you have already sent</p>
+          </div>
+        </div>
+
+        <?php if ($ok): ?><div class="ef-alert ef-alert-ok"><?= e((string) $ok) ?></div><?php endif; ?>
+        <?php if ($err): ?><div class="ef-alert ef-alert-error"><?= e((string) $err) ?></div><?php endif; ?>
+        <?php if (!empty($errors['form'])): ?>
+          <div class="ef-alert ef-alert-error"><?= e((string) $errors['form']) ?></div>
+        <?php endif; ?>
+
+        <div class="ef-alert ef-alert-info">
+          EduFlex is a capstone prototype, not a product. There is no helpdesk on duty.
+          What you send here is stored against your account for the project team to read,
+          and you will see it in the list below. Nothing is emailed to anybody.
+        </div>
+
+        <div class="ef-row">
+          <div class="ef-col ef-stack">
+
+            <!-- New request -->
+            <form class="ef-card ef-card-lg" action="actions/support_submit.php" method="post">
+              <?= csrf_field() ?>
+              <div class="ef-card-title" style="margin-bottom:6px;">Send a request</div>
+              <div class="ef-card-sub" style="margin-bottom:18px;">
+                The more precisely you describe what you did and what happened, the more
+                use it is to the team.
+              </div>
+
+              <div class="ef-field">
+                <label class="ef-label" for="request_type">What is this about</label>
+                <select class="ef-input<?= isset($errors['request_type']) ? ' is-invalid' : '' ?>"
+                        id="request_type" name="request_type" required>
+                  <option value="">Choose one</option>
+                  <?php foreach (SUPPORT_TYPES as $key => $label): ?>
+                    <option value="<?= e($key) ?>"<?= $draftType === $key ? ' selected' : '' ?>>
+                      <?= e($label) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+                <?php if (isset($errors['request_type'])): ?>
+                  <div class="ef-error"><?= e((string) $errors['request_type']) ?></div>
+                <?php endif; ?>
+              </div>
+
+              <div class="ef-field">
+                <label class="ef-label" for="subject">Subject</label>
+                <input class="ef-input<?= isset($errors['subject']) ? ' is-invalid' : '' ?>"
+                       id="subject" name="subject" type="text" maxlength="255"
+                       value="<?= e($draftSubject) ?>"
+                       placeholder="One line, for example: practice set would not load" required>
+                <?php if (isset($errors['subject'])): ?>
+                  <div class="ef-error"><?= e((string) $errors['subject']) ?></div>
+                <?php endif; ?>
+              </div>
+
+              <div class="ef-field">
+                <label class="ef-label" for="message">Details</label>
+                <textarea class="ef-input<?= isset($errors['message']) ? ' is-invalid' : '' ?>"
+                          id="message" name="message" rows="6"
+                          maxlength="<?= (int) SUPPORT_MESSAGE_MAX ?>"
+                          placeholder="What were you doing, what did you expect, and what happened instead?"
+                          required><?= e($draftMessage) ?></textarea>
+                <?php if (isset($errors['message'])): ?>
+                  <div class="ef-error"><?= e((string) $errors['message']) ?></div>
+                <?php endif; ?>
+              </div>
+
+              <button class="ef-btn ef-btn-primary" type="submit">Record this request</button>
+            </form>
+
+            <!-- This learner's own requests -->
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-head">
+                <div class="ef-card-title">Your requests</div>
+                <span class="ef-muted" style="font-size:11.5px;">
+                  <?= count($requests) ?> sent
+                </span>
+              </div>
+
+              <?php if (!$requests): ?>
+                <div class="ef-empty-state">
+                  <div class="ef-empty-ico"></div>
+                  <h5>You have not sent anything</h5>
+                  <p>
+                    Requests you send appear here with their status, so you can see what
+                    the team has looked at. Nothing is shown to other learners.
+                  </p>
+                </div>
+              <?php else: ?>
+                <?php foreach ($requests as $r): ?>
+                  <?php $status = (string) $r['status']; ?>
+                  <div class="ef-list-row ef-notif">
+                    <span class="ef-list-ico">#<?= (int) $r['request_id'] ?></span>
+                    <div class="ef-list-main">
+                      <div class="ef-notif-head">
+                        <span class="ef-list-title"><?= e((string) $r['subject']) ?></span>
+                        <span class="ef-band ef-band-<?= e(support_status_band($status)) ?>">
+                          <?= e(support_status_label($status)) ?>
+                        </span>
+                        <span class="ef-list-meta" style="margin-top:0;">
+                          <?= e(date('j M Y', strtotime((string) $r['created_at']))) ?>
+                        </span>
+                      </div>
+                      <div class="ef-list-meta">
+                        <?= e(support_type_label((string) $r['request_type'])) ?>
+                      </div>
+                      <div class="ef-notif-body"><?= nl2br(e((string) $r['message'])) ?></div>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </section>
+          </div>
+
+          <div class="ef-col-fixed-360 ef-stack">
+
+            <!-- Static FAQ. Written out, not generated, and not fake tickets. -->
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:6px;">Common questions</div>
+              <div class="ef-card-sub" style="margin-bottom:16px;">
+                Answered here so you do not have to ask
+              </div>
+
+              <div class="ef-stack" style="gap:16px;">
+                <div>
+                  <div class="ef-list-title">EduFlex cannot read my PDF.</div>
+                  <p class="ef-notif-body">
+                    A scanned page is an image, and there is no text in it to extract.
+                    Open the file and try to select a sentence with your cursor. If you
+                    cannot, EduFlex cannot either.
+                  </p>
+                </div>
+                <div>
+                  <div class="ef-list-title">Why does my topic say "No data"?</div>
+                  <p class="ef-notif-body">
+                    A topic needs <?= (int) MASTERY_MIN_ITEMS ?> scored answers before
+                    EduFlex will put a number on it. Fewer than that is not enough
+                    evidence to call a mastery score honest.
+                  </p>
+                </div>
+                <div>
+                  <div class="ef-list-title">A generated question was wrong.</div>
+                  <p class="ef-notif-body">
+                    Report it with the "A generated question or answer was wrong" type
+                    above, and quote the question. EduFlex checks every generated
+                    question against its own material before storing it, but the check
+                    cannot catch everything, and these reports are what the team uses to
+                    improve it.
+                  </p>
+                </div>
+                <div>
+                  <div class="ef-list-title">Does this affect my real grades?</div>
+                  <p class="ef-notif-body">
+                    No. EduFlex is a study aid. Nothing in it is reported to any
+                    instructor and nothing contributes to an official grade.
+                  </p>
+                </div>
+                <div>
+                  <div class="ef-list-title">Can I get my data out, or delete it?</div>
+                  <p class="ef-notif-body">
+                    Yes, both, from Settings, without asking anybody. Export gives you a
+                    JSON file of everything stored about you. Delete removes your
+                    account and all of it permanently.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section class="ef-card ef-card-sky">
+              <span class="ef-eyebrow">Responsible AI</span>
+              <p class="ef-second" style="font-size:12.5px;margin-top:8px;line-height:1.6;">
+                EduFlex answers only from material you upload, and it says so when your
+                material does not contain the answer. If it ever answers confidently
+                from something you did not give it, that is a defect worth reporting.
+              </p>
+            </section>
+          </div>
+        </div>
+      </div>'''
 
 
 STATS = "require_once __DIR__ . '/../includes/stats.php';"
@@ -2011,7 +2558,12 @@ PAGES = [
     ("growth.php",    "Growth Insights",       "growth",    GROWTH,    STATS),
     ("scores.php",    "Monitor Scores",        "scores",    SCORES,    STATS),
     ("history.php",   "Review History",        "history",   HISTORY,   STATS),
-    ("settings.php",  "Profile Settings",      "settings",  SETTINGS,  STATS),
+    ("settings.php",  "Profile Settings",      "settings",  SETTINGS,
+     STATS + "\nrequire_once __DIR__ . '/../includes/avatar.php';"),
+    ("notifications.php", "Notifications",     "",          NOTIFICATIONS,
+     "require_once __DIR__ . '/../includes/notifications.php';"),
+    ("support.php",   "Support",               "support",   SUPPORT,
+     "require_once __DIR__ . '/../includes/support.php';"),
 ]
 
 written = []
