@@ -6,8 +6,14 @@ config/ai.php
 storage/uploads/*
 !storage/uploads/.gitkeep
 
-# Composer, if you install smalot/pdfparser for better PDF support.
-vendor/
+# Composer's vendor directory, AT THE PROJECT ROOT ONLY.
+#
+# The leading slash matters. Written as "vendor/" this pattern also matches
+# assets/vendor/, which holds Bootstrap, jQuery and the Inter font. Those are
+# vendored deliberately so the system makes no external network request and
+# renders identically in a room with no wifi. They MUST be committed, or a
+# fresh clone has an unstyled interface and no working JavaScript.
+/vendor/
 composer.lock
 
 # Editor and OS noise.
