@@ -402,7 +402,17 @@ function questions_generate(int $topicProgressId, int $userId, ?string $bloomLev
         return $fail(
             'Only ' . count($checked['items']) . ' of the generated questions were usable. '
             . 'Try again, or pick a different topic.',
-            ['bloom' => $bloom, 'rejected' => $checked['rejected'], 'reasons' => $checked['reasons']]
+            [
+                'bloom'    => $bloom,
+                // The usable count is reported even though the set is refused,
+                // so a caller can tell "nothing survived" from "three survived
+                // but the floor is four". tools/rubric_run.php needs that
+                // distinction; without it a discarded set looks the same as a
+                // provider that returned nothing at all.
+                'items'    => count($checked['items']),
+                'rejected' => $checked['rejected'],
+                'reasons'  => $checked['reasons'],
+            ]
         );
     }
 

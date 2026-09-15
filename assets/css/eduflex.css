@@ -983,6 +983,581 @@ p { margin: 0; }
 .ef-float-card strong { font-size: 14px; display: block; }
 .ef-float-card p { font-size: 12px; color: var(--ef-text-2); margin-top: 4px; line-height: 1.5; }
 
+/* --------------------------------------------------------------------------
+   14b. LANDING PAGE MOTION AND HOVER
+
+   Everything here is decoration. None of it changes what the page says or
+   whether it can be used, which is why the whole section switches itself off
+   under prefers-reduced-motion at the end.
+
+   Two rules held throughout:
+     Every hover state has a matching :focus-visible, or the page is only
+     responsive to a mouse and a keyboard user gets nothing.
+     Only transform and opacity are animated. Animating width, top or box-shadow
+     makes the browser re-lay-out the page on every frame.
+   -------------------------------------------------------------------------- */
+
+/* ---- The robot ---------------------------------------------------------- */
+
+.ef-bot {
+  /* Set by initLanding() as the cursor moves. Declared here so the SVG is
+     never in an undefined state, including with JavaScript turned off. */
+  --ef-eye-x: 0px;
+  --ef-eye-y: 0px;
+  --ef-head-x: 0px;
+  --ef-head-y: 0px;
+
+  animation: ef-bot-float 6s ease-in-out infinite;
+  transition: transform .5s cubic-bezier(.22, 1, .36, 1);
+  overflow: visible;
+}
+
+@keyframes ef-bot-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+
+/* The head leans a little toward the cursor. Small on purpose: a few pixels
+   reads as attention, more reads as a glitch. */
+.ef-bot-head {
+  transform: translate(var(--ef-head-x), var(--ef-head-y));
+  transition: transform .45s cubic-bezier(.22, 1, .36, 1);
+}
+
+.ef-bot-eyes {
+  transform: translate(var(--ef-eye-x), var(--ef-eye-y));
+  transition: transform .25s cubic-bezier(.22, 1, .36, 1);
+}
+
+/* The blink. transform-box makes transform-origin resolve against the shape's
+   own box rather than the whole SVG canvas, without which the eye scales
+   toward the top-left corner of the illustration. */
+.ef-bot-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ef-bot-blink 6.4s infinite;
+}
+/* A hair of offset, so the two eyes do not close in perfect lockstep. */
+.ef-bot-eye:last-child { animation-delay: .06s; }
+
+@keyframes ef-bot-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95%           { transform: scaleY(.08); }
+}
+
+.ef-bot-antenna {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ef-bot-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes ef-bot-pulse {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  50%      { transform: scale(1.35); opacity: .65; }
+}
+
+.ef-bot-glow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ef-bot-breathe 7s ease-in-out infinite;
+}
+
+@keyframes ef-bot-breathe {
+  0%, 100% { transform: scale(1);    opacity: .16; }
+  50%      { transform: scale(1.06); opacity: .24; }
+}
+
+.ef-bot-orbit {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ef-bot-orbit 26s linear infinite;
+}
+
+@keyframes ef-bot-orbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* The three bars fill in sequence, so the body panel reads as a document being
+   written rather than a static graphic. */
+.ef-bot-line {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: ef-bot-write 3.4s ease-in-out infinite;
+}
+.ef-bot-line-2 { animation-delay: .28s; }
+.ef-bot-line-3 { animation-delay: .56s; }
+
+@keyframes ef-bot-write {
+  0%, 55%, 100% { transform: scaleX(1);   opacity: 1; }
+  25%           { transform: scaleX(.35); opacity: .55; }
+}
+
+.ef-bot-arm {
+  transform-box: fill-box;
+  transform-origin: top center;
+  transition: transform .45s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* ---- The robot notices you ---------------------------------------------- */
+
+/* Hovering the illustration wakes it up: it lifts, the antenna pulses faster,
+   and the arms come up a few degrees. */
+.ef-hero-visual:hover .ef-bot { transform: scale(1.03); }
+.ef-hero-visual:hover .ef-bot-antenna { animation-duration: 1s; }
+.ef-hero-visual:hover .ef-bot-arm-left  { transform: rotate(-9deg); }
+.ef-hero-visual:hover .ef-bot-arm-right { transform: rotate(9deg); }
+
+/* A press gives one nod, then it settles. The class is removed by the script
+   when the animation ends, so it can fire again on the next press. */
+.ef-bot.is-nodding .ef-bot-head { animation: ef-bot-nod .5s ease-in-out; }
+
+@keyframes ef-bot-nod {
+  0%, 100% { transform: translate(var(--ef-head-x), var(--ef-head-y)) rotate(0deg); }
+  35%      { transform: translate(var(--ef-head-x), calc(var(--ef-head-y) + 7px)) rotate(-3deg); }
+  70%      { transform: translate(var(--ef-head-x), var(--ef-head-y)) rotate(2deg); }
+}
+
+.ef-hero-visual {
+  /* The pointer says the illustration is worth touching. */
+  cursor: pointer;
+  overflow: visible;
+}
+
+/* ---- The floating chips ------------------------------------------------- */
+
+.ef-float,
+.ef-float-card {
+  /* --ef-parallax is set per chip by the script from its data-depth, so the
+     three cards drift by different amounts and the group gains some depth. */
+  --ef-parallax-x: 0px;
+  --ef-parallax-y: 0px;
+  transform: translate3d(var(--ef-parallax-x), var(--ef-parallax-y), 0);
+  transition: transform .6s cubic-bezier(.22, 1, .36, 1), box-shadow .3s ease;
+}
+.ef-hero-visual:hover .ef-float,
+.ef-hero-visual:hover .ef-float-card { box-shadow: var(--ef-shadow-lg); }
+
+/* The status dot on the card reads as a live indicator rather than a bullet. */
+.ef-float-card .dot { animation: ef-bot-pulse 2.6s ease-in-out infinite; }
+
+/* ---- Navigation --------------------------------------------------------- */
+
+/* An underline that grows from the left rather than appearing all at once.
+   Drawn with a pseudo-element and scaleX so nothing re-lays-out per frame. */
+.ef-topnav-links a {
+  position: relative;
+  padding-bottom: 3px;
+  transition: color .2s ease;
+}
+.ef-topnav-links a::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ef-primary);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform .25s cubic-bezier(.22, 1, .36, 1);
+}
+.ef-topnav-links a:hover::after,
+.ef-topnav-links a:focus-visible::after { transform: scaleX(1); }
+.ef-topnav-links a:focus-visible { color: var(--ef-primary); outline: none; }
+
+.ef-logo {
+  display: inline-block;
+  transition: transform .25s cubic-bezier(.34, 1.56, .64, 1), color .2s ease;
+}
+.ef-logo:hover { transform: scale(1.04); color: var(--ef-primary); }
+
+/* ---- Buttons ------------------------------------------------------------ */
+
+/* A visible keyboard focus ring is the one thing here that is not decoration,
+   so it is the one thing applied everywhere rather than only on the landing
+   page. Without it a keyboard user cannot see what they are about to press,
+   on any screen in the system. */
+.ef-btn:focus-visible {
+  outline: 2px solid var(--ef-primary);
+  outline-offset: 2px;
+}
+
+/* The lift is scoped to .ef-public, which is the landing page and nothing else.
+   A button on a data screen should not move when a cursor crosses it: the app
+   pages are dense, and the whole layout would feel unsteady. */
+.ef-public .ef-btn {
+  transition: background .18s ease, color .18s ease, border-color .18s ease,
+              transform .18s cubic-bezier(.34, 1.56, .64, 1), box-shadow .18s ease;
+}
+.ef-public .ef-btn-primary:hover,
+.ef-public .ef-btn-ghost:hover,
+.ef-public .ef-btn-soft:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ef-shadow-md);
+}
+/* Keeps the existing press, and drops the lift shadow while it is held. */
+.ef-public .ef-btn:active { transform: translateY(1px); box-shadow: none; }
+
+/* The play triangle on "See How it Works" nudges forward, the way a play
+   control should. */
+.ef-public .ef-btn-ghost svg {
+  transition: transform .25s cubic-bezier(.34, 1.56, .64, 1);
+}
+.ef-public .ef-btn-ghost:hover svg { transform: translateX(3px); }
+
+/* ---- The four step cards ------------------------------------------------ */
+
+/* Only on a landing card. The same class inside the app is a data panel and
+   should not move when a cursor crosses it. */
+.ef-public .ef-card {
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1),
+              box-shadow .28s ease, border-color .28s ease;
+}
+.ef-public .ef-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--ef-shadow-md);
+  border-color: var(--ef-primary-bright);
+}
+.ef-public .ef-card .ef-badge {
+  transition: background .28s ease, color .28s ease;
+}
+.ef-public .ef-card:hover .ef-badge {
+  background: var(--ef-primary);
+  color: var(--ef-on-primary);
+}
+
+/* ---- Footer ------------------------------------------------------------- */
+
+.ef-page-footer a {
+  position: relative;
+  transition: color .2s ease;
+}
+.ef-page-footer a:hover,
+.ef-page-footer a:focus-visible { color: var(--ef-primary); }
+.ef-page-footer a::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -2px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform .25s cubic-bezier(.22, 1, .36, 1);
+}
+.ef-page-footer a:hover::after,
+.ef-page-footer a:focus-visible::after { transform: scaleX(1); }
+
+/* ---- Motion is optional -------------------------------------------------
+
+   Vestibular disorders make looping and parallax motion genuinely unpleasant,
+   and some people simply do not want it. A visitor who has asked their system
+   for reduced motion gets the whole page with none of the movement: the hover
+   colours and the focus outlines stay, because those carry meaning.
+
+   initLanding() checks the same preference and does not track the cursor at
+   all, so the eyes stay centred rather than being animated to a stop.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .ef-bot,
+  .ef-bot-eye,
+  .ef-bot-antenna,
+  .ef-bot-glow,
+  .ef-bot-orbit,
+  .ef-bot-line,
+  .ef-float-card .dot {
+    animation: none !important;
+  }
+  .ef-bot,
+  .ef-bot-head,
+  .ef-bot-eyes,
+  .ef-bot-arm,
+  .ef-float,
+  .ef-float-card,
+  .ef-public .ef-card,
+  .ef-btn,
+  .ef-logo {
+    transition: none !important;
+    transform: none !important;
+  }
+  .ef-topnav-links a::after,
+  .ef-page-footer a::after {
+    transition: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   14c. LEGAL PAGES (privacy.php, terms.php)
+
+   Long-form prose, which nothing else in EduFlex is. The measure is capped at
+   72ch because a line of text much longer than that is genuinely harder to
+   read, and these are documents somebody has to get through before deciding
+   whether to take part in a study.
+   -------------------------------------------------------------------------- */
+.ef-legal {
+  max-width: 72ch;
+  margin: 0 auto;
+  padding: 16px clamp(18px, 5vw, 48px) 72px;
+  color: var(--ef-text-2);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.ef-legal-eyebrow {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ef-primary);
+  margin-bottom: 10px;
+}
+.ef-legal h1 {
+  font-size: clamp(30px, 5vw, 40px);
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  color: var(--ef-text);
+  margin-bottom: 16px;
+}
+.ef-legal-lead {
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ef-text-2);
+}
+.ef-legal-date {
+  font-size: 12.5px;
+  color: var(--ef-text-muted);
+  margin: 14px 0 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--ef-border);
+}
+
+.ef-legal section { margin-bottom: 38px; }
+.ef-legal h2 {
+  font-size: 19px;
+  color: var(--ef-text);
+  margin-bottom: 12px;
+  letter-spacing: -.01em;
+}
+.ef-legal h3 {
+  font-size: 14px;
+  color: var(--ef-text);
+  margin: 20px 0 8px;
+}
+.ef-legal p { margin-bottom: 14px; }
+.ef-legal ul { margin: 0 0 14px; padding-left: 22px; }
+.ef-legal li { margin-bottom: 9px; }
+.ef-legal strong { color: var(--ef-text); font-weight: 600; }
+.ef-legal a { color: var(--ef-primary); font-weight: 600; }
+.ef-legal a:hover { text-decoration: underline; }
+.ef-legal code {
+  font-size: 13px;
+  background: var(--ef-surface-subtle);
+  border: 1px solid var(--ef-border);
+  border-radius: var(--ef-r-sm);
+  padding: 1px 6px;
+}
+
+/* The sections a reader must not skim past: what the AI can get wrong, and
+   that the prototype may lose their work. */
+.ef-legal-important {
+  background: var(--ef-surface-sky);
+  border-left: 3px solid var(--ef-primary);
+  border-radius: 0 var(--ef-r-md) var(--ef-r-md) 0;
+  padding: 22px 24px 8px;
+}
+
+/* An aside that qualifies the section above it rather than adding to it. */
+.ef-legal-note {
+  font-size: 13px;
+  color: var(--ef-text-muted);
+  border-left: 2px solid var(--ef-border);
+  padding-left: 14px;
+}
+
+.ef-legal-foot {
+  margin-top: 8px;
+  padding-top: 24px;
+  border-top: 1px solid var(--ef-border);
+  font-size: 13.5px;
+}
+
+/* The "Who to Contact" list from the consent form. Appears twice: full width
+   inside .ef-legal on privacy.php, and in a 360px card on the Support page, so
+   it is written to work at either width rather than assuming one. */
+.ef-contact-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+.ef-contact-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ef-border);
+  margin: 0;
+}
+.ef-contact-list li:last-child { border-bottom: 0; }
+
+.ef-contact-name {
+  font-weight: 600;
+  color: var(--ef-text);
+  font-size: 13.5px;
+}
+.ef-contact-role {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ef-text-muted);
+}
+/* Pushed to its own line at card width, and onto the right at full width. */
+.ef-contact-phone {
+  margin-left: auto;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ef-contact-phone a { color: var(--ef-primary); font-weight: 600; }
+.ef-contact-phone a:hover { text-decoration: underline; }
+
+/* The Support page card borrows the legal prose sizes, because the block was
+   written as prose and looks wrong at the card's default 13px. */
+.ef-legal-inline p {
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ef-text-2);
+  margin-bottom: 12px;
+}
+.ef-legal-inline p:last-child { margin-bottom: 0; }
+.ef-legal-inline .ef-contact-name { font-size: 13px; }
+
+/* A value nobody has filled in yet. Deliberately loud: a participant must
+   never read a placeholder as though it were an answer, and the project team
+   must not be able to demo the page without noticing. */
+.ef-legal-missing {
+  background: var(--ef-weak-bg);
+  color: #9F1239;
+  font-weight: 600;
+  border-radius: var(--ef-r-sm);
+  padding: 1px 7px;
+  font-size: 13.5px;
+}
+
+/* --------------------------------------------------------------------------
+   14d. LANDING PAGE SECTIONS (features, methodology, resources)
+
+   The section wrapper replaces the inline padding that used to be repeated on
+   every <section> in index.php. clamp() so 48px of side padding does not eat a
+   quarter of a phone screen.
+   -------------------------------------------------------------------------- */
+.ef-section {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 clamp(18px, 5vw, 48px) 90px;
+  scroll-margin-top: 24px;   /* the nav jumps here, so leave breathing room */
+}
+/* The tinted band runs the full width of the window, so its own side padding
+   would be measured against the window rather than against the 1440px column
+   the other sections sit in, and its heading would land about 30px left of
+   theirs. Padding moves to the children instead: each is capped at the same
+   1440px and carries the same side padding, so every heading on the page
+   starts on the same vertical line. box-sizing is border-box globally, so the
+   padding is inside that 1440px in both cases. */
+.ef-section-tinted {
+  max-width: none;
+  padding-inline: 0;
+  background: var(--ef-surface-subtle);
+  border-block: 1px solid var(--ef-border);
+  padding-top: 64px;
+  margin-bottom: 90px;
+}
+.ef-section-tinted > * {
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: clamp(18px, 5vw, 48px);
+}
+
+/* The seven module cards. auto-fit rather than a fixed count, so seven cards
+   reflow sensibly instead of leaving one stranded on its own row. */
+.ef-module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 16px;
+}
+.ef-module { display: flex; flex-direction: column; }
+.ef-module-items {
+  list-style: none;
+  margin: auto 0 0;
+  padding: 0;
+  border-top: 1px solid var(--ef-border);
+  padding-top: 12px;
+}
+.ef-module-items li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ef-text-2);
+  margin-bottom: 7px;
+}
+.ef-module-items li:last-child { margin-bottom: 0; }
+/* A tick drawn in CSS rather than an icon font, per rule 3. */
+.ef-module-items li::before {
+  content: '';
+  position: absolute;
+  left: 2px; top: 6px;
+  width: 4px; height: 8px;
+  border: solid var(--ef-primary);
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(45deg);
+}
+
+/* The mastery formula. A <pre> because the alignment carries meaning. */
+.ef-formula {
+  background: var(--ef-ink);
+  color: #CFE9FA;
+  border-radius: var(--ef-r-md);
+  padding: 18px 20px;
+  margin: 16px 0;
+  font-size: 12.5px;
+  line-height: 1.9;
+  overflow-x: auto;
+  white-space: pre;
+}
+.ef-formula sub { color: var(--ef-cyan); font-size: .8em; }
+
+/* The reference list. Hanging indent, which is what a reference list wants and
+   what an ordered list does not give you by default. */
+.ef-references {
+  list-style: none;
+  counter-reset: ref;
+  margin: 0;
+  padding: 0;
+  max-width: 88ch;
+}
+.ef-references li {
+  counter-increment: ref;
+  position: relative;
+  padding-left: 38px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ef-text-2);
+}
+.ef-references li::before {
+  content: counter(ref) '.';
+  position: absolute;
+  left: 0;
+  width: 28px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--ef-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.ef-references a {
+  color: var(--ef-primary);
+  /* A DOI is long and has no spaces, so it must be allowed to break. */
+  overflow-wrap: anywhere;
+}
+.ef-references a:hover { text-decoration: underline; }
+
 /* Auth */
 .ef-auth-page {
   min-height: 100vh;
@@ -1228,6 +1803,15 @@ p { margin: 0; }
   .ef-topnav-links { display: none; }
 }
 
+/* Defensive, not a fix for anything observed. A grid item defaults to
+   min-width:auto and refuses to shrink below its own min-content width, which
+   is the usual way a hero section ends up forcing a horizontal scrollbar on a
+   phone. It does not happen here today, because the illustration is an SVG at
+   width:100% and so has no intrinsic minimum, but it would the moment somebody
+   dropped a wide table, a long unbroken string or a fixed-width image into
+   either column. Costs nothing at any width. */
+.ef-hero > * { min-width: 0; }
+
 @media (max-width: 860px) {
   /* Sidebar becomes an off-canvas drawer */
   .ef-shell { background: none; }
@@ -1280,6 +1864,16 @@ p { margin: 0; }
   .ef-hero-ctas .ef-btn { width: 100%; }
   .ef-stats { grid-template-columns: 1fr 1fr; }
   .ef-page-head { align-items: flex-start; flex-direction: column; }
+
+  /* The landing page at phone width. 48px of side padding is a quarter of the
+     screen here, and the top bar cannot fit a logo, a link and a button on one
+     line without pushing the page wider than the viewport. */
+  .ef-hero { padding: 24px 18px 48px; }
+  .ef-topnav { padding: 14px 18px; gap: 10px 16px; flex-wrap: wrap; }
+  .ef-topnav-right { gap: 14px; }
+  .ef-logo { font-size: 22px; }
+  .ef-page-footer { padding: 16px 18px; }
+  .ef-page-footer a { margin-left: 0; margin-right: 18px; }
 }
 
 /* Utility */

@@ -6,6 +6,12 @@ config/ai.php
 storage/uploads/*
 !storage/uploads/.gitkeep
 
+# The manuscript. Large, not source code, and Chapter IV may carry participant
+# data. The landing page content taken from it lives in includes/manuscript.php,
+# which IS committed; that file is the interface between the two.
+docs/*.docx
+docs/*.pdf
+
 # Composer's vendor directory, AT THE PROJECT ROOT ONLY.
 #
 # The leading slash matters. Written as "vendor/" this pattern also matches

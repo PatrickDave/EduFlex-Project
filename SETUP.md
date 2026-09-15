@@ -208,6 +208,27 @@ key. A fresh clone has to create it:
 Then open your copy and set `AI_DRIVER` and `AI_API_KEY`. Without this step every
 page fails with an undefined constant.
 
+## 9b. Updating an existing database (do not reimport)
+
+`database/01_schema.sql` begins with `DROP DATABASE`. That is correct for a first
+install and it is how a database full of your accounts, uploads and mastery
+scores gets wiped by somebody trying to add one column.
+
+Once you have data you care about, apply schema changes this way instead:
+
+    C:\xampp\php\php.exe tools\migrate.php            (show what is missing)
+    C:\xampp\php\php.exe tools\migrate.php --apply    (add it)
+
+It prints how many accounts, materials, topics and attempts the database holds
+before it does anything, lists each change and whether it is already present, and
+adds only what is missing. It never drops a table, never drops a column and never
+deletes a row. Running it against an up-to-date database reports "nothing to do".
+
+`database/02_migrations.sql` is the same set of changes as plain SQL, if you
+would rather paste it into phpMyAdmin.
+
+Reimport `01_schema.sql` only when you genuinely want to start over.
+
 ## 10. Run the test suite (optional but useful)
 
 Open a terminal in the project folder:
@@ -223,11 +244,13 @@ Open a terminal in the project folder:
     C:\xampp\php\php.exe tests\settings_test.php
     C:\xampp\php\php.exe tests\security_test.php
     C:\xampp\php\php.exe tests\avatar_test.php
+    C:\xampp\php\php.exe tests\rubric_test.php
+    C:\xampp\php\php.exe tests\legal_test.php
 
-Expect `Passed: 40`, `32`, `63`, `73`, `81`, `69`, `77`, `39`, `60`, `79` and
-`87`, all with `Failed: 0`, for 700 checks in total. On Mac or Linux,
-`./run_tests.sh` runs all eleven. None needs a database, a web server, an API key
-or an internet connection.
+Expect `Passed: 40`, `32`, `63`, `73`, `81`, `69`, `77`, `39`, `60`, `79`, `87`,
+`69`, `76` and `36`, all with `Failed: 0`, for 881 checks in total. On Mac or Linux,
+`./run_tests.sh` runs all fourteen. None needs a database, a web server, an API
+key or an internet connection.
 
 One exception to that. 5 of the 32 extraction checks build a .docx fixture,
 which needs PHP's `zip` extension. If you see

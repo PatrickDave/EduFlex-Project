@@ -22,8 +22,12 @@ per topic. A chat companion answers questions from that same material.
 - Android is a WebView over these same responsive pages. It is not a second build.
 
 ```
-# import the schema (drops and recreates the eduflex database)
+# FIRST INSTALL ONLY. This drops and recreates the eduflex database.
 mysql -u root < database/01_schema.sql
+
+# An existing database with data in it: adds what is missing, drops nothing.
+php tools/migrate.php            # show what is missing
+php tools/migrate.php --apply    # add it
 
 # run every PHP test suite: no database, no server, no API key, no internet
 ./run_tests.sh
@@ -90,7 +94,23 @@ keeping.
 15. **Nav icons live in `ef_nav_icon()` in `partials/sidebar.php`**, inline and
     `stroke="currentColor"` so they take the colour of the row. Do not add an
     icon font or an SVG sprite from a CDN; rule 3 forbids it.
-16. Prefer `Read`/`Edit` over shell redirection for file work.
+16. **Never destroy Patrick's development data.** He works in the same database
+    you test against, and losing it costs him a re-registration and a re-upload
+    every time. Three specific prohibitions, all of which have already been
+    broken once:
+    - **Never run `mysql < database/01_schema.sql` against a database in use.**
+      It opens with `DROP DATABASE`. To apply a schema change use
+      `php tools/migrate.php --apply`, which adds what is missing and drops
+      nothing. Reimport only for a genuinely fresh install, and ask first.
+    - **Never use a blanket `DELETE FROM user`** to clean up after testing. It
+      takes his account with yours. Delete the specific test emails you created:
+      `DELETE FROM user WHERE email IN ('smoke@example.com', ...)`.
+    - **Check before you clean.** `SELECT user_id, email FROM user` first. If
+      there is an account you did not create, leave it and everything under it.
+    A schema change is three files now: `01_schema.sql` for fresh installs,
+    `02_migrations.sql` plus the list in `tools/migrate.php` for existing ones,
+    and `SCHEMA-NOTES.md` for the reason.
+17. Prefer `Read`/`Edit` over shell redirection for file work.
 
 ## The mastery model
 
@@ -181,10 +201,19 @@ includes/
   support.php     support requests: the fixed type list and validation
   security.php    response headers, error output, login throttling
   avatar.php      profile pictures: validation, storage, initials fallback
+  rubric.php      the arithmetic and Markdown behind the rubric run
+  legal.php       the study facts and the Who to Contact block behind
+                  privacy.php, terms.php and the Support page
+  manuscript.php  the seven modules and the reference list, taken from the
+                  manuscript, rendered by the landing page
 app/              eleven GENERATED pages, plus app/actions/*.php endpoints
-partials/         sidebar.php and topbar.php, one copy for every page
-database/         01_schema.sql and SCHEMA-NOTES.md
-tests/            eleven PHP suites, two Playwright suites
+partials/         sidebar.php and topbar.php for the app, public_footer.php
+                  for index/login/register/privacy/terms
+database/         01_schema.sql (fresh install, destructive),
+                  02_migrations.sql (existing database, safe), SCHEMA-NOTES.md
+tests/            fourteen PHP suites, two Playwright suites
+tools/            rubric_run.php (the only script that spends quota),
+                  migrate.php (schema changes without losing data)
 build_pages.py    regenerates app/*.php from one shell template
 ```
 
@@ -196,11 +225,12 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-700 PHP checks across eleven suites, all passing, plus 83 browser checks:
+881 PHP checks across fourteen suites, all passing, plus 83 browser checks:
 
 ```
 auth 40 | extract 32 | ai 63 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 39 | settings 60 | security 79 | avatar 87
+rubric 69 | legal 76 | manuscript 36
 runner_browser 54 | chat_browser 29
 ```
 
@@ -216,7 +246,7 @@ leaked a passage tag into its answer.
 
 ## Schema deviations from Chapter III
 
-Five additions, documented in `database/SCHEMA-NOTES.md`, all still needing to
+Seven additions, documented in `database/SCHEMA-NOTES.md`, all still needing to
 be written into the manuscript:
 
 1. `learning_activity.topic_progress_id`
@@ -224,30 +254,106 @@ be written into the manuscript:
 3. the whole `resource_chunk` table
 4. seven extraction columns on `learning_resource`
 5. the `bloom_level` reference table
+6. the whole `login_attempt` table, for login rate limiting
+7. `user.avatar_path`, for profile pictures
 
 Unresolved: `topic_progress` is keyed on `(user_id, resource_id, topic_name)`, so
 one topic appearing in two uploads produces two separate mastery scores. The
 `subscription` table still contradicts the non-commercial decision in Chapter I.
 
+## Two sub-modules in Chapter III are NOT built
+
+Found on 15 September 2026 while building the landing page from the manuscript.
+The List of Modules claims 34 sub-modules. Two of them do not exist in code:
+
+1. **Account and Access Management 5, "Manage Subscription".** There is no way
+   to manage a subscription because EduFlex is non-commercial per Chapter I. A
+   `subscription` row is written at registration to satisfy the documented ERD
+   and nothing reads it. This is the same contradiction noted above.
+2. **Learning Activity and Assessment 2, "Generate Mock Examinations".** The
+   only `activity_type` anywhere in the system is `'practice_set'`. There is no
+   mock-examination path in `includes/questions.php`.
+
+Both are omitted from `includes/manuscript.php`, so the public page claims 32 of
+the 34 rather than advertising something that does not exist.
+`tests/manuscript_test.php` fails if either is added back, and also fails if a
+second activity type appears, which would mean mock exams became real.
+
+**Patrick decided on 15 September 2026: build both.** Not renumber, not defer.
+So the next layer is these two sub-modules, and when they land the page should
+show 34 of 34 and the guards in `tests/manuscript_test.php` need updating with
+them rather than around them.
+
+Worth thinking about before starting:
+
+- **Manage Subscription** has to be squared with Chapter I, which says the
+  system is non-commercial. A subscription screen that sells nothing is the
+  "toggle that changes nothing" problem again. The defensible version is a plan
+  screen that shows the learner they are on the free plan, what it includes,
+  and that EduFlex will never charge, reading the `subscription` row that
+  already exists. That satisfies the module without inventing commerce, and it
+  resolves the Chapter I contradiction instead of deepening it. Confirm the
+  framing with Patrick before building.
+- **Generate Mock Examinations** needs a second `activity_type`, which touches
+  the quota rules: a mock exam presumably spans several topics and is longer
+  than eight questions, so it costs more than one call. Decide the size, how
+  topics are chosen, and whether it scores into mastery the same way a practice
+  set does, before writing any of it. If it scores into mastery, the Bloom and
+  recency weighting in `mastery_recalculate()` applies unchanged and nothing
+  else needs to move.
+
 ## Still to do
 
-1. **The AI-output validation rubric run. Start here, and it is blocked on
-   Patrick.** `config/ai.php` still has `AI_DRIVER = 'mock'` and an empty
-   `AI_API_KEY`, so the Chapter IV numbers cannot be produced by anybody but
-   him. Set a real driver and key, generate several sets from real material, and
-   record how many questions `questions_validate()` discarded and why.
+1. **The AI-output validation rubric run. Start here. Only Patrick can do it.**
+   The harness is built and tested: `tools/rubric_run.php`. It refuses to run
+   against the mock, because the mock returns questions written to pass
+   validation and would report a 0 percent rejection rate that measures nothing.
+
+   ```
+   # 1. set AI_DRIVER, AI_API_KEY and AI_MODEL in config/ai.php
+   # 2. upload a real document, let EduFlex read it, run topic detection
+   # 3. then:
+   php tools/rubric_run.php --sets=12 --out=docs/rubric-run.md
+   ```
+
+   It prints and writes a Markdown report: questions returned, how many
+   `questions_validate()` discarded, the count for each reason, and how many
+   whole sets fell under the four-usable floor. Paste it into Chapter IV. Twelve
+   sets is twelve provider calls; it asks for confirmation before spending.
 2. Patrick has still not run topic detection, generation or chat against a real
    provider. The live HTTP call is the one untested path in the system, and
    item 1 is what would finally exercise it.
 3. Serve over HTTPS. The `Secure` cookie flag and HSTS are already written and
    turn themselves on when `security_is_https()` returns true, so this is a
    deployment step, not a code change.
-4. Decide what to do about Privacy Policy and Terms of Service. Both are
-   `href="#"` on `index.php`, `login.php` and `register.php`, and the
-   registration form makes a learner tick "I agree to the Terms and Privacy
-   Policy" for documents that do not exist. For a study with a consent
-   commitment that is a real gap, but the text is Patrick's and his adviser's to
-   write, not something to invent in code.
+4. Nothing outstanding on the consent documents. `privacy.php` and `terms.php`
+   are public, linked everywhere, and complete: Patrick supplied the five study
+   facts on 15 September 2026 and `includes/legal.php` now holds them, so the
+   unfinished banner is gone. `tests/legal_test.php` asserts none of the five
+   is a placeholder, so reverting one to a TODO fails the suite rather than
+   quietly showing a red banner to participants again.
+
+   The "Who to Contact" block from the approved consent form is rendered by
+   `legal_contact_block()` in `includes/legal.php` and appears in two places:
+   section 11 of `privacy.php`, and a card on the Support page. One function so
+   the two cannot disagree about a phone number.
+
+   **The adviser's personal mobile is deliberately absent.** Patrick asked on
+   15 September 2026 that the four student researchers be listed with their
+   numbers and the adviser not be. He is named, and reachable through the
+   published college line. `tests/legal_test.php` asserts his mobile appears
+   nowhere, so pasting the whole consent form back in fails the suite. Do not
+   add it without asking him.
+
+   Two things to check with the adviser before the defense, neither a code
+   change:
+   - The contact address is a personal Gmail rather than an institutional one.
+     Some ethics reviewers expect a university address on a participant-facing
+     document.
+   - The retention line says data is deleted at the end of the academic year in
+     which the study concludes. If the ethics submission says something else,
+     the submission is what a reviewer will hold him to; change the constant to
+     match it.
 
 ## Manuscript fixes outstanding (no code)
 
@@ -275,6 +381,11 @@ Added by the notifications and settings layer, still to be written up:
    from the figures or label them future work.
 3. Get Support is implemented as a recorded request with no helpdesk behind it,
    and the page says so. Do not let the manuscript imply a staffed support desk.
+4. `privacy.php` doubles as the participant information sheet, so Chapter III's
+   informed-consent and right-to-withdraw sections can cite it directly rather
+   than describing a document that only exists in the manuscript. It states
+   plainly that the project team can read the database, which is the disclosure
+   an ethics reviewer will look for.
 
 ## Working with Patrick
 

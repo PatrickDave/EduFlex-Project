@@ -136,14 +136,7 @@ $justDeleted = isset($_GET['deleted']);
     </div>
   </main>
 
-  <footer class="ef-page-footer">
-    <span>&copy; 2026 EduFlex. University of Cebu, College of Computer Studies.</span>
-    <span>
-      <a href="#">Privacy Policy</a>
-      <a href="#">Terms of Service</a>
-      <a href="app/support.php">Contact Support</a>
-    </span>
-  </footer>
+<?php include __DIR__ . '/partials/public_footer.php'; ?>
 </div>
 
 <script src="assets/vendor/jquery-3.7.1.min.js"></script>

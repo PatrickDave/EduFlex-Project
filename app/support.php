@@ -10,6 +10,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/support.php';
+require_once __DIR__ . '/../includes/legal.php';
 auth_require_login();
 
 $user   = auth_user();
@@ -167,6 +168,21 @@ $draftMessage = (string) ($draft['message'] ?? '');
           </div>
 
           <div class="ef-col-fixed-360 ef-stack">
+
+            <?php
+            /* The "Who to Contact" block from the approved consent form. It sits
+               above the FAQ because a participant who wants a person should not
+               have to scroll past a list of answers to find one. Rendered by
+               legal_contact_block() so this and privacy.php cannot disagree
+               about a phone number. */
+            ?>
+            <section class="ef-card ef-card-lg ef-legal-inline">
+              <div class="ef-card-title" style="margin-bottom:6px;">Who to contact</div>
+              <div class="ef-card-sub" style="margin-bottom:14px;">
+                A real person, for anything this page does not answer
+              </div>
+              <?= legal_contact_block(true) ?>
+            </section>
 
             <!-- Static FAQ. Written out, not generated, and not fake tickets. -->
             <section class="ef-card ef-card-lg">

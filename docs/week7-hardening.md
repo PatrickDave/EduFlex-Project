@@ -31,9 +31,12 @@ likely to ask about these than about the things that were wrong:
 - Output escaping is clean. Every rendered value goes through `e()`. The two uses
   of `nl2br()` wrap `e()` rather than the reverse, which is the order that
   matters.
-- All 18 action endpoints check a CSRF token **and** refuse anything that is not
-  a POST. Verified by posting to `delete_account.php` with a valid session and no
-  token: refused, and the account survived.
+- Every action endpoint that changes anything checks a CSRF token **and** refuses
+  anything that is not a POST. That was all 18 at the time of this audit; three
+  more arrived with profile pictures, and 20 of the 21 now follow the rule. The
+  exception is `avatar_show.php`, a GET that serves the session's own picture and
+  changes nothing. Verified by posting to `delete_account.php` with a valid
+  session and no token: refused, and the account survived.
 - No SQL is built by concatenation anywhere. The `LIMIT` values are clamped and
   cast to `int` before interpolation, and the one `WHERE` fragment that varies
   chooses between two fixed strings.

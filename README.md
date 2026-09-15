@@ -18,6 +18,9 @@ eduflex-ui/
   index.php                Landing page (with the AI assistant illustration)
   login.php                Log in. Handles GET and POST.
   register.php             Create account. Handles GET and POST.
+  privacy.php              Privacy Policy and participant information sheet.
+                           Public: it must be readable before registering.
+  terms.php                Terms of Service. Public, same reason.
   auth/
     logout.php             Destroys the session
   app/                     Every page here requires a login
@@ -54,11 +57,22 @@ eduflex-ui/
     support.php            Support requests: the fixed type list, validation
     security.php           Response headers, error output, login throttling
     avatar.php             Profile pictures: validation, storage, initials
+    rubric.php             The arithmetic and Markdown behind the rubric run
+    legal.php              The study facts privacy.php and terms.php need, the
+                           Who to Contact block, and the banner shown while any
+                           value is unfilled
+    manuscript.php         The seven modules and the reference list, taken from
+                           the manuscript, rendered on the landing page
   partials/
     sidebar.php            Sidebar markup, one copy for every page
     topbar.php             Header markup, one copy for every page
+    public_footer.php      Footer for the five public pages, so the legal
+                           links are defined once rather than five times
   database/
-    01_schema.sql          The full schema. Import this into phpMyAdmin.
+    01_schema.sql          The full schema. FIRST INSTALL ONLY: it begins with
+                           DROP DATABASE.
+    02_migrations.sql      The same changes as safe, re-runnable ALTERs, for a
+                           database that already has data in it.
     SCHEMA-NOTES.md        Seven deviations from Chapter III, and why each one
   tests/
     auth_test.php          40 checks
@@ -79,6 +93,13 @@ eduflex-ui/
                            headers, login throttling, session expiry
     avatar_test.php        87 checks, including two polyglot files that
                            getimagesize() alone accepts as valid PNGs
+    rubric_test.php        69 checks on the Chapter IV arithmetic, including
+                           the cases a mock run can never produce
+    legal_test.php         76 checks that the consent documents are public,
+                           linked everywhere, and that the adviser's personal
+                           number is not published
+    manuscript_test.php    36 checks that every nav link resolves and that no
+                           unbuilt module is advertised
     runner_browser_test.py 54 checks against a running system (Playwright)
     chat_browser_test.py   29 checks against a running system (Playwright)
   assets/
@@ -87,6 +108,11 @@ eduflex-ui/
     vendor/                Bootstrap 5.3.3, jQuery 3.7.1 and Inter, all local.
                            The system makes no external network request at all,
                            so it renders identically in a room with no wifi.
+  tools/
+    rubric_run.php         Produces the Chapter IV validator figures. The only
+                           script here that spends provider quota.
+    migrate.php            Applies schema changes to an existing database
+                           without dropping anything. Run it, never 01_schema.
   build_pages.py           Regenerates the 11 app pages from one template
 ```
 
@@ -123,8 +149,11 @@ asserts all of them.
 **Input and output**
 
 - Every query uses a prepared statement. No SQL is built by concatenation.
-- Every form carries a CSRF token, checked with `hash_equals`. All eighteen
-  endpoints in `app/actions/` check it and refuse anything that is not a POST.
+- Every form carries a CSRF token, checked with `hash_equals`. Twenty of the
+  twenty-one endpoints in `app/actions/` check it and refuse anything that is
+  not a POST. The exception is `avatar_show.php`, which is the `src` of an
+  `<img>`: it is a GET, it changes nothing, and it serves only the session's own
+  picture, so there is no state for a token to protect and no id to tamper with.
 - All output goes through `e()`, which escapes for HTML.
 - Uploads are checked by extension **and** by leading bytes, stored under a
   generated name, and `storage/.htaccess` denies Apache from serving or
@@ -468,6 +497,43 @@ strips anything hiding alongside the image data. The GD extension is not enabled
 on the development machine, and shipping an untested branch that would start
 running the moment somebody enabled it is the worse trade. Recorded as optional
 future hardening in `docs/week7-hardening.md`.
+
+## 6g. Measuring what the validator discards
+
+`tools/rubric_run.php`. This is the only script in the repository that costs
+money, and the only thing that produces the Chapter IV figures on AI output
+quality.
+
+```
+php tools/rubric_run.php --sets=12 --out=docs/rubric-run.md
+```
+
+It generates N practice sets from material already uploaded, and reports how
+many questions the model returned, how many `questions_validate()` discarded,
+the count for each reason, and how many whole sets fell below the four-usable
+floor. Output is Markdown, ready to paste into the manuscript.
+
+Four things about it are deliberate:
+
+1. **It refuses to run against the mock provider.** The mock returns questions
+   written to pass validation, so a mock run reports a 0 percent rejection rate.
+   That number would be a measurement of the mock, not of a language model, and
+   putting it in Chapter IV would be a false claim. `--allow-mock` exists to
+   check the harness itself, and stamps a warning across the report.
+2. **It asks before spending.** Each set is one provider call. A mistyped
+   `--sets=120` is 120 calls, so it prints the plan and waits for a `y`.
+3. **A failed provider call is not a validation result.** A set the model never
+   returned says nothing about the quality of its questions, so it is counted
+   separately and excluded from every rate. Counting failures as sets with zero
+   rejections would make the model look better the more often it broke.
+4. **The arithmetic is not in the script.** `rubric_summarise()` and
+   `rubric_report()` live in `includes/rubric.php` and are pure, so
+   `tests/rubric_test.php` asserts them without a provider. A percentage in a
+   manuscript should come from arithmetic somebody has checked, not from a
+   one-off script that cannot be run twice the same way.
+
+Nothing is thrown away: the sets a rubric run generates are stored like any
+other, so the learner ends up with real practice material.
 
 ## 7. What was deliberately left out
 

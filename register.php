@@ -103,8 +103,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <label class="ef-check" style="margin-bottom:8px;">
           <input type="checkbox" name="agree" value="1" required>
-          <span>I agree to the <a href="#" class="ef-primary" style="font-weight:600;">Terms</a>
-          and <a href="#" class="ef-primary" style="font-weight:600;">Privacy Policy</a></span>
+          <span>I agree to the
+            <a href="terms.php" target="_blank" rel="noopener"
+               class="ef-primary" style="font-weight:600;">Terms of Service</a>
+            and the
+            <a href="privacy.php" target="_blank" rel="noopener"
+               class="ef-primary" style="font-weight:600;">Privacy Policy</a></span>
         </label>
         <?php if (isset($errors['agree'])): ?>
           <p class="ef-error" style="margin-bottom:12px;"><?= e($errors['agree']) ?></p>
@@ -127,14 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   </main>
 
-  <footer class="ef-page-footer">
-    <span>&copy; 2026 EduFlex. University of Cebu, College of Computer Studies.</span>
-    <span>
-      <a href="#">Privacy Policy</a>
-      <a href="#">Terms of Service</a>
-      <a href="app/support.php">Contact Support</a>
-    </span>
-  </footer>
+<?php include __DIR__ . '/partials/public_footer.php'; ?>
 </div>
 
 <script src="assets/vendor/jquery-3.7.1.min.js"></script>
