@@ -110,7 +110,16 @@ keeping.
     A schema change is three files now: `01_schema.sql` for fresh installs,
     `02_migrations.sql` plus the list in `tools/migrate.php` for existing ones,
     and `SCHEMA-NOTES.md` for the reason.
-17. Prefer `Read`/`Edit` over shell redirection for file work.
+17. **A PDF that extracts cleanly is not the same as a PDF that extracted
+    correctly.** `pdf_text_confidence()` detects capitals stranded inside words
+    and nothing else, and a subset font with no ToUnicode map shifts every
+    letter instead, producing all-capitals gibberish that scores a perfect
+    1.000. `pdf_text_looks_garbled()` is the second check; both run, and either
+    one warns. Its thresholds were measured against real samples and are
+    recorded in `tests/extract_test.php`. Do not tighten them by guess, and do
+    not add a minimum token count: run-together text has few tokens by
+    definition, which is the signal itself.
+18. Prefer `Read`/`Edit` over shell redirection for file work.
 
 ## The mastery model
 
@@ -206,12 +215,14 @@ includes/
                   privacy.php, terms.php and the Support page
   manuscript.php  the seven modules and the reference list, taken from the
                   manuscript, rendered by the landing page
+  subscription.php  plans, the free/premium tiers, the Settings plan card
+  exams.php       mock examinations: topic choice, assembly, breakdown
 app/              eleven GENERATED pages, plus app/actions/*.php endpoints
 partials/         sidebar.php and topbar.php for the app, public_footer.php
                   for index/login/register/privacy/terms
 database/         01_schema.sql (fresh install, destructive),
                   02_migrations.sql (existing database, safe), SCHEMA-NOTES.md
-tests/            fourteen PHP suites, two Playwright suites
+tests/            sixteen PHP suites, two Playwright suites
 tools/            rubric_run.php (the only script that spends quota),
                   migrate.php (schema changes without losing data)
 build_pages.py    regenerates app/*.php from one shell template
@@ -225,12 +236,12 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-881 PHP checks across fourteen suites, all passing, plus 83 browser checks:
+990 PHP checks across sixteen suites, all passing, plus 83 browser checks:
 
 ```
-auth 40 | extract 32 | ai 63 | questions 73 | attempts 81 | chat 69
+auth 40 | extract 44 | ai 63 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 39 | settings 60 | security 79 | avatar 87
-rubric 69 | legal 76 | manuscript 36
+rubric 69 | legal 76 | manuscript 39 | subscription 48 | exams 46
 runner_browser 54 | chat_browser 29
 ```
 
@@ -256,51 +267,49 @@ be written into the manuscript:
 5. the `bloom_level` reference table
 6. the whole `login_attempt` table, for login rate limiting
 7. `user.avatar_path`, for profile pictures
+8. `activity_item.topic_progress_id` and `activity_item.bloom_level`, so an
+   item can carry its own when a mock examination spans several
 
 Unresolved: `topic_progress` is keyed on `(user_id, resource_id, topic_name)`, so
 one topic appearing in two uploads produces two separate mastery scores. The
 `subscription` table still contradicts the non-commercial decision in Chapter I.
 
-## Two sub-modules in Chapter III are NOT built
+## Manage Subscription and Generate Mock Examinations
 
-Found on 15 September 2026 while building the landing page from the manuscript.
-The List of Modules claims 34 sub-modules. Two of them do not exist in code:
+Both were listed in the Chapter III List of Modules and missing from the code.
+Patrick asked for both on 16 September 2026 and both were built that day, so the
+system now does all 34 sub-modules and the landing page says so.
 
-1. **Account and Access Management 5, "Manage Subscription".** There is no way
-   to manage a subscription because EduFlex is non-commercial per Chapter I. A
-   `subscription` row is written at registration to satisfy the documented ERD
-   and nothing reads it. This is the same contradiction noted above.
-2. **Learning Activity and Assessment 2, "Generate Mock Examinations".** The
-   only `activity_type` anywhere in the system is `'practice_set'`. There is no
-   mock-examination path in `includes/questions.php`.
+**Manage Subscription** is the plan card on Settings, backed by
+`includes/subscription.php`. It reads the `subscription` row that has existed
+since registration and that nothing read before.
 
-Both are omitted from `includes/manuscript.php`, so the public page claims 32 of
-the 34 rather than advertising something that does not exist.
-`tests/manuscript_test.php` fails if either is added back, and also fails if a
-second activity type appears, which would mean mock exams became real.
+The manuscript never actually said EduFlex is non-commercial. That claim lived in
+three code comments and in this file, and a search of all 134,000 characters
+found nothing about EduFlex's own pricing; the data dictionary says plan_type is
+"free or premium". Patrick chose to keep premium in the design as future work, so
+the card shows the free plan, lists what premium would add, and states plainly
+that it is not offered and cannot be bought. `subscription_cost_statement()` is
+the single source for what a learner is told about money, and `terms.php` reads
+it too, because that page used to claim "there is no subscription".
 
-**Patrick decided on 15 September 2026: build both.** Not renumber, not defer.
-So the next layer is these two sub-modules, and when they land the page should
-show 34 of 34 and the guards in `tests/manuscript_test.php` need updating with
-them rather than around them.
+**Generate Mock Examinations** is `includes/exams.php`. Twenty questions across
+up to three topics, weakest first.
 
-Worth thinking about before starting:
+Three design points worth keeping:
 
-- **Manage Subscription** has to be squared with Chapter I, which says the
-  system is non-commercial. A subscription screen that sells nothing is the
-  "toggle that changes nothing" problem again. The defensible version is a plan
-  screen that shows the learner they are on the free plan, what it includes,
-  and that EduFlex will never charge, reading the `subscription` row that
-  already exists. That satisfies the module without inventing commerce, and it
-  resolves the Chapter I contradiction instead of deepening it. Confirm the
-  framing with Patrick before building.
-- **Generate Mock Examinations** needs a second `activity_type`, which touches
-  the quota rules: a mock exam presumably spans several topics and is longer
-  than eight questions, so it costs more than one call. Decide the size, how
-  topics are chosen, and whether it scores into mastery the same way a practice
-  set does, before writing any of it. If it scores into mastery, the Bloom and
-  recency weighting in `mastery_recalculate()` applies unchanged and nothing
-  else needs to move.
+- **It assembles before it generates.** A 20-question exam written from scratch
+  is three provider calls every time. It takes questions the learner has not been
+  asked from sets that already exist and generates only the shortfall, so a
+  learner who has practised gets an exam for nothing. `tests/exams_test.php`
+  asserts a fully stocked exam makes zero calls.
+- **It excludes by question text, not item id.** Building an exam copies the
+  chosen questions into the exam's own activity, because an item belongs to one
+  activity. Answering the copy leaves the original untouched, so an id-based
+  check served the same question again in the next exam. The test caught it.
+- **Exam answers count toward mastery identically**, for every topic touched.
+  `attempt_finish()` recalculates each of them through
+  `attempt_topics_touched()`, rather than the single topic a practice set has.
 
 ## Still to do
 

@@ -16,6 +16,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/includes/security.php';
 require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/includes/legal.php';
+require_once __DIR__ . '/includes/subscription.php';
 
 security_harden_error_output();
 security_headers();
@@ -53,8 +54,20 @@ security_headers();
     <p>
       EduFlex is a capstone research prototype built by BS Information Technology students
       at the University of Cebu Main Campus, College of Computer Studies. It is coursework
-      and part of a study. It is not a commercial service, there is nothing to pay, there
-      is no subscription, and no part of it will ever ask you for money.
+      and part of a study.
+    </p>
+    <p>
+      <?php
+      /* Was "there is no subscription", which stopped being true the moment
+         Settings grew a plan card. The statement about cost comes from
+         subscription_cost_statement() so this page, that card and anything
+         added later cannot end up saying different things. */
+      ?>
+      <?= e(subscription_cost_statement()) ?>
+      Your account is on the free plan, which includes every feature EduFlex has. A
+      premium tier appears in the system's design documentation and is not offered:
+      it cannot be bought, switched to, or enabled, and nothing in EduFlex is withheld
+      from you because of it. You can see your own plan under Settings.
     </p>
     <p>
       By creating an account you agree to these terms and to the

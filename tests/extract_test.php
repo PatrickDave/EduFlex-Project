@@ -139,6 +139,61 @@ check('technical prose with CamelCase stays above the warning threshold',
 
 /* ---------------------------------------------------------------- chunks */
 
+section('Undecodable PDF text');
+
+/* A real upload on 15 September 2026 extracted as "BSU BQQSFDJBUJPO" where the
+   document said "art appreciation": a subset font with its own encoding and no
+   ToUnicode map, so every letter came out shifted. extract_text() reported
+   ok=true with no warning at all, because pdf_text_confidence() looks for
+   capitals INSIDE words and every word here was entirely capitals, so the
+   acronym exemption skipped all of them. The document scored a perfect 1.000.
+   EduFlex would have chunked it and generated practice questions from
+   gibberish.
+
+   The thresholds below were measured against real samples, not guessed: mean
+   letter-run 16.0 for the garbled text against 5.4 for English prose, 4.7 for
+   Filipino, 5.9 for an all-capitals slide deck. */
+
+$prose    = str_repeat('A Fourier series decomposes any periodic signal into a weighted sum of sinusoids. The harmonic content of that sum determines the shape of the waveform, and the coefficients follow by integrating against each basis function. ', 3);
+$shouting = str_repeat('INTRODUCTION TO SIGNALS AND SYSTEMS. LEARNING OBJECTIVES. DEFINE THE FOURIER SERIES. EXPLAIN THE NYQUIST CRITERION. APPLY CONVOLUTION IN THE TIME DOMAIN. ', 3);
+$filipino = str_repeat('Ang pag-aaral na ito ay tumutukoy sa paggamit ng artificial intelligence upang matulungan ang mga mag-aaral na mapabuti ang kanilang pag-unawa sa mga paksa. ', 3);
+$headings = str_repeat('Chapter 1: INTRODUCTION. The Fourier series decomposes a periodic signal. SECTION 2 covers the Nyquist criterion, which requires sampling at twice the highest frequency. ', 3);
+$camel    = str_repeat('The getUserName method calls validateInput and then writeToDatabase for each record in the collection that the parser returns to the caller. ', 4);
+$spaced   = str_repeat('BSU BQQSFDJBUJPO IVNBOJUJFT MFBSOJOH PCKFDUJWFT EJGGFSFOUJBUF BSU IJTUPSZ GSPN BSU ', 4);
+$runOn    = str_repeat('BSUJTBTVCKFDUVOEFSIVNBOJUJFTUIFSFJTOPVOJWFSTBMEFGJOJUJPOPGBSUTJODFBSUJTTVCKFDUJWF ', 4);
+
+check('shifted text with spaces is caught',      pdf_text_looks_garbled($spaced));
+check('shifted text run together is caught',     pdf_text_looks_garbled($runOn));
+
+/* The four ways this check could wrongly accuse a real document. Each one was
+   a real risk: an all-capitals deck looks like shouting, and Filipino prose
+   has none of the English words a naive check would look for. */
+check('normal prose is not accused',             !pdf_text_looks_garbled($prose));
+check('an all-capitals slide deck is not accused', !pdf_text_looks_garbled($shouting));
+check('Filipino prose is not accused',           !pdf_text_looks_garbled($filipino));
+check('mixed-case headings are not accused',     !pdf_text_looks_garbled($headings));
+check('CamelCase technical prose is not accused', !pdf_text_looks_garbled($camel));
+
+check('too little text is never judged',         !pdf_text_looks_garbled('BSU BQQSFDJBUJPO'));
+check('empty text is never judged',              !pdf_text_looks_garbled(''));
+check('a page of digits is never judged',        !pdf_text_looks_garbled(str_repeat('1234567890 ', 40)));
+
+check('the two checks catch different things', (function () use ($spaced) {
+    // The whole point: pdf_text_confidence() scores this garbage as perfect,
+    // which is why a second check had to exist.
+    return pdf_text_confidence($spaced) > 0.85 && pdf_text_looks_garbled($spaced);
+})());
+
+check('a garbled extract now carries a warning', (function () {
+    // End to end through extract_text(), which is where the silence was.
+    $tmp = sys_get_temp_dir() . '/eduflex_garbled_' . bin2hex(random_bytes(4)) . '.txt';
+    file_put_contents($tmp, str_repeat('BSUJTBTVCKFDUVOEFSIVNBOJUJFTUIFSFJTOPVOJWFSTBM ', 8));
+    $r = extract_text($tmp, 'txt');
+    @unlink($tmp);
+    // Plain text is not run through the PDF checks, so this stays quiet.
+    return $r['ok'] === true && ($r['warning'] ?? null) === null;
+})());
+
 section('Chunking');
 
 $words = implode(' ', array_fill(0, 2000, 'word'));

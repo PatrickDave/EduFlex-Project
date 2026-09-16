@@ -61,6 +61,24 @@ $migrations = [
                       ADD COLUMN avatar_path VARCHAR(255) NULL DEFAULT NULL
                       AFTER account_status",
     ],
+    [
+        'name'  => 'activity_item.topic_progress_id (mock examinations)',
+        'since' => '2026-09-16',
+        'check' => static fn(PDO $pdo): bool =>
+            migrate_column_exists($pdo, 'activity_item', 'topic_progress_id'),
+        'sql'   => "ALTER TABLE activity_item
+                      ADD COLUMN topic_progress_id INT(11) NULL DEFAULT NULL
+                      AFTER explanation",
+    ],
+    [
+        'name'  => 'activity_item.bloom_level (mock examinations)',
+        'since' => '2026-09-16',
+        'check' => static fn(PDO $pdo): bool =>
+            migrate_column_exists($pdo, 'activity_item', 'bloom_level'),
+        'sql'   => "ALTER TABLE activity_item
+                      ADD COLUMN bloom_level VARCHAR(20) NULL DEFAULT NULL
+                      AFTER topic_progress_id",
+    ],
 ];
 
 /* -------------------------------------------------------------------------

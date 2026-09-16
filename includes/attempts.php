@@ -105,6 +105,7 @@ function attempt_load(int $attemptId, int $userId): array
         'SELECT aa.attempt_id, aa.activity_id, aa.score, aa.total_items,
                 aa.started_at, aa.completed_at,
                 la.title, la.bloom_level, la.difficulty_level, la.topic_progress_id,
+                la.activity_type,
                 tp.topic_name
            FROM activity_attempt aa
            JOIN learning_activity la ON la.activity_id = aa.activity_id
@@ -303,9 +304,22 @@ function attempt_finish(int $attemptId, int $userId): array
         );
         $stmt->execute([$score, $attemptId]);
 
+        /* Every topic this attempt produced evidence for, not just one.
+
+           A practice set belongs to one topic and its items leave
+           activity_item.topic_progress_id NULL, so this returns exactly the
+           activity's topic and behaves as it always did. A mock examination
+           belongs to no single topic and its items each carry their own, so
+           this returns all of them and each is recalculated. Without it a
+           learner could answer twenty exam questions and watch nothing move. */
+        $touched = attempt_topics_touched($attemptId, $userId);
+
         $mastery = null;
-        if ($attempt['topic_progress_id'] !== null) {
-            $mastery = mastery_recalculate((int) $attempt['topic_progress_id'], $userId);
+        foreach ($touched as $topicId) {
+            $result = mastery_recalculate($topicId, $userId);
+            // The first is returned for the result screen, which for a practice
+            // set is the only one there is.
+            $mastery ??= $result;
         }
 
         db()->commit();
@@ -331,6 +345,45 @@ function attempt_finish(int $attemptId, int $userId): array
         'mastery' => $mastery,
         'error'   => null,
     ];
+}
+
+/**
+ * Every topic an attempt produced evidence for.
+ *
+ * An item's own topic when it has one, the activity's otherwise, which is the
+ * same rule mastery_recalculate() applies. A practice set yields exactly one
+ * topic; a mock examination yields one per topic it covered.
+ *
+ * Answered items only. A question the learner skipped is evidence of nothing
+ * and its topic does not need recomputing.
+ *
+ * @return list<int>
+ */
+function attempt_topics_touched(int $attemptId, int $userId): array
+{
+    try {
+        $stmt = db()->prepare(
+            'SELECT DISTINCT COALESCE(ai.topic_progress_id, la.topic_progress_id) AS topic_progress_id
+               FROM attempt_response ar
+               JOIN activity_attempt aa  ON aa.attempt_id = ar.attempt_id
+               JOIN activity_item ai     ON ai.item_id = ar.item_id
+               JOIN learning_activity la ON la.activity_id = aa.activity_id
+              WHERE ar.attempt_id = ? AND aa.user_id = ?'
+        );
+        $stmt->execute([$attemptId, $userId]);
+    } catch (Throwable $e) {
+        error_log('EduFlex attempt_topics_touched failed: ' . $e->getMessage());
+        return [];
+    }
+
+    $topics = [];
+    foreach ($stmt->fetchAll() as $row) {
+        if ($row['topic_progress_id'] !== null) {
+            $topics[] = (int) $row['topic_progress_id'];
+        }
+    }
+
+    return $topics;
 }
 
 /* -------------------------------------------------------------------------
@@ -368,17 +421,44 @@ function mastery_recalculate(int $topicProgressId, int $userId): array
     $previousBand = (string) ($before['weakness_priority'] ?? 'none');
     $topicName    = (string) ($before['topic_name'] ?? '');
 
-    // Newest first, because the recency weight is defined by position.
+    /* Newest first, because the recency weight is defined by position.
+
+       The two COALESCE calls are what let a mock examination feed mastery. A
+       practice set belongs to one topic at one Bloom level, so its items leave
+       activity_item.topic_progress_id and activity_item.bloom_level NULL and
+       inherit from the activity, which is exactly what this query did before
+       those columns existed. A mock examination spans several topics and
+       several levels, so its items carry their own and are counted against the
+       right topic at the right weight.
+
+       The topic test is written as two column comparisons rather than the
+       obvious COALESCE(ai.topic_progress_id, la.topic_progress_id) = ?, and
+       that is not a style choice. SQLite applies type affinity from the COLUMN
+       on the left of a comparison, and COALESCE(...) is an expression with no
+       affinity, so the bound parameter stayed TEXT '1' and never matched
+       INTEGER 1. Every mastery figure silently became 0. MySQL coerces the two
+       and would have hidden it until the test suite ran. Comparing a plain
+       column to the parameter on each side keeps the affinity and works on
+       both engines.
+
+       Nothing else about the formula changed. tests/attempts_test.php passes
+       unaltered across this edit, which is the evidence that existing mastery
+       figures are untouched. */
     $stmt = db()->prepare(
-        'SELECT ar.is_correct, la.bloom_level
+        'SELECT ar.is_correct,
+                COALESCE(ai.bloom_level, la.bloom_level) AS bloom_level
            FROM attempt_response ar
            JOIN activity_attempt aa  ON aa.attempt_id = ar.attempt_id
+           JOIN activity_item ai     ON ai.item_id = ar.item_id
            JOIN learning_activity la ON la.activity_id = aa.activity_id
           WHERE aa.user_id = ?
-            AND la.topic_progress_id = ?
+            AND (
+                  ai.topic_progress_id = ?
+                  OR (ai.topic_progress_id IS NULL AND la.topic_progress_id = ?)
+                )
        ORDER BY ar.answered_at DESC, ar.response_id DESC'
     );
-    $stmt->execute([$userId, $topicProgressId]);
+    $stmt->execute([$userId, $topicProgressId, $topicProgressId]);
     $responses = $stmt->fetchAll();
 
     $weighted = 0.0;

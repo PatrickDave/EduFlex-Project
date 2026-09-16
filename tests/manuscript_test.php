@@ -15,9 +15,11 @@
  *   The module list matches the manuscript. Chapter III decomposes EduFlex into
  *   seven modules and 34 sub-modules, and the page is built from that list.
  *
- *   Two sub-modules that are NOT built stay off the page. "Manage Subscription"
- *   and "Generate Mock Examinations" appear in the manuscript and not in the
- *   code, and a public page must not claim a feature that does not exist.
+ *   Nothing is advertised that is not built. "Manage Subscription" and
+ *   "Generate Mock Examinations" were in the manuscript and not in the code
+ *   until 16 September 2026, and were kept off this page until they worked.
+ *   Now that both exist, each claim has to be backed by the file and the screen
+ *   that provide it.
  */
 
 declare(strict_types=1);
@@ -94,10 +96,10 @@ check('every module has a blurb and at least four functions', (function () {
     return true;
 })());
 
-check('32 of the 34 sub-modules are shown', (function () {
+check('all 34 sub-modules are shown', (function () {
     $n = 0;
     foreach (MANUSCRIPT_MODULES as $m) { $n += count($m['items']); }
-    return $n === 32;
+    return $n === 34;
 })());
 
 check('no sub-module is listed twice', (function () {
@@ -108,36 +110,49 @@ check('no sub-module is listed twice', (function () {
     return count($all) === count(array_unique($all));
 })());
 
-section('Unbuilt features are not claimed');
+section('Nothing is claimed that is not built');
 
-/* These two are in the manuscript's list of 34 and not in the code. If somebody
-   adds them here to make the count reach 34, this fails. Build them first, or
-   record them in Chapter V as future work. */
-check('"Manage Subscription" is not on the page', (function () {
+/* These two were listed in the manuscript and missing from the code until
+   16 September 2026, and were kept off this page until they worked. The
+   assertions now run the other way: each is advertised, and each has to be
+   backed by something real. Listing a sub-module here before it exists is the
+   failure mode this section guards. */
+
+check('"Manage subscription" is advertised', (function () {
     foreach (MANUSCRIPT_MODULES as $m) {
         foreach ($m['items'] as $item) {
-            if (stripos($item, 'subscription') !== false) { return false; }
+            if (stripos($item, 'subscription') !== false) { return true; }
         }
     }
-    return true;
+    return false;
 })());
 
-check('"Generate Mock Examinations" is not on the page', (function () {
+check('and it is backed by a real module',
+    is_file(__DIR__ . '/../includes/subscription.php'));
+
+check('and the Settings page renders it',
+    str_contains((string) file_get_contents(__DIR__ . '/../app/settings.php'),
+        'subscription_for('));
+
+check('"Generate mock examinations" is advertised', (function () {
     foreach (MANUSCRIPT_MODULES as $m) {
         foreach ($m['items'] as $item) {
-            if (stripos($item, 'mock exam') !== false) { return false; }
+            if (stripos($item, 'mock exam') !== false) { return true; }
         }
     }
-    return true;
+    return false;
 })());
 
-check('the code really does have only one activity type', (function () {
-    // The reason mock examinations are absent. If a second type is ever added,
-    // this fails and the module list should be revisited.
-    $questions = (string) file_get_contents(__DIR__ . '/../includes/questions.php');
-    preg_match_all("/'(practice_set|mock_exam|quiz|exam)'/", $questions, $m);
-    return array_unique($m[1]) === ['practice_set'];
+check('and the code really does store a second activity type', (function () {
+    // The reason mock examinations can be advertised. If this ever reverts to
+    // practice_set alone, the claim on the page became false.
+    $exams = (string) file_get_contents(__DIR__ . '/../includes/exams.php');
+    return str_contains($exams, "EXAM_ACTIVITY_TYPE = 'mock_exam'");
 })());
+
+check('and the Practice page offers one',
+    str_contains((string) file_get_contents(__DIR__ . '/../app/practice.php'),
+        'actions/exam_start.php'));
 
 /* ----------------------------------------------------------- references */
 

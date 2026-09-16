@@ -2,8 +2,9 @@
 /**
  * EduFlex — authentication and session handling.
  *
- * Covers modules 1 to 6 of Account and Access Management, minus Manage
- * Subscription. Include this at the very top of any page, before output.
+ * Covers modules 1 to 6 of Account and Access Management. Manage Subscription
+ * lives in includes/subscription.php, which this file calls at registration.
+ * Include this at the very top of any page, before output.
  */
 
 declare(strict_types=1);
@@ -13,6 +14,7 @@ require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/notifications.php';
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/avatar.php';
+require_once __DIR__ . '/subscription.php';
 
 /* -------------------------------------------------------------------------
    Session lifetime
@@ -175,13 +177,6 @@ function auth_register(string $fullName, string $email, string $password, bool $
 
         $userId = (int) $pdo->lastInsertId();
 
-        // EduFlex is a non-commercial prototype, so every account gets the
-        // free plan. The row exists only to satisfy the documented ERD.
-        $stmt = $pdo->prepare(
-            'INSERT INTO subscription (user_id, plan_type, status) VALUES (?, ?, ?)'
-        );
-        $stmt->execute([$userId, 'free', 'active']);
-
         $pdo->commit();
     } catch (PDOException $e) {
         if ($pdo->inTransaction()) {
@@ -194,6 +189,13 @@ function auth_register(string $fullName, string $email, string $password, bool $
             'user_id' => null,
         ];
     }
+
+    /* Every account starts on the free plan. Deliberately outside the
+       transaction and through subscription_create(), which logs rather than
+       throws: subscription_for() reports the free plan when the row is absent,
+       so a failure here costs the learner nothing. The plan rules live in
+       includes/subscription.php rather than here. */
+    subscription_create($userId);
 
     /* Welcome notification, so the bell is not empty on the first visit.
        Deliberately outside the transaction: this used to be an INSERT inside

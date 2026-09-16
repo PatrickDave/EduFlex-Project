@@ -11,6 +11,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/stats.php';
 require_once __DIR__ . '/../includes/avatar.php';
+require_once __DIR__ . '/../includes/subscription.php';
 auth_require_login();
 
 $user   = auth_user();
@@ -53,6 +54,7 @@ $avatarOk    = flash_get('avatar_ok');
 $avatarErr   = flash_get('avatar_error');
 
 $hasAvatar = avatar_has($uid);
+$plan      = subscription_for($uid);
 ?>
       <div class="ef-content">
 
@@ -277,6 +279,54 @@ $hasAvatar = avatar_has($uid);
           </div>
 
           <div class="ef-col-fixed-360 ef-stack">
+            <?php
+            /* Account and Access Management 5: Manage Subscription. The
+               subscription row has existed since registration; this is the
+               first thing that reads it. There is nothing to buy, so the card
+               states the plan, what it includes, and that EduFlex will never
+               ask for money. The premium tier is shown as designed and
+               unavailable because the Chapter III data dictionary defines
+               plan_type as "free or premium"; see includes/subscription.php. */
+            ?>
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-head" style="margin-bottom:6px;">
+                <div class="ef-card-title">Your plan</div>
+                <span class="ef-band ef-band-<?= e(subscription_status_band($plan['status'])) ?>">
+                  <?= e($plan['label']) ?>
+                </span>
+              </div>
+              <div class="ef-card-sub" style="margin-bottom:14px;">
+                <?= e(subscription_since($plan)) ?>
+              </div>
+
+              <p class="ef-second" style="font-size:12.5px;line-height:1.6;margin-bottom:12px;">
+                <?= e($plan['summary']) ?>
+              </p>
+
+              <ul class="ef-plan-includes">
+                <?php foreach ($plan['includes'] as $feature): ?>
+                  <li><?= e($feature) ?></li>
+                <?php endforeach; ?>
+              </ul>
+
+              <?php foreach (SUBSCRIPTION_PLANS as $key => $other): ?>
+                <?php if ($key === $plan['plan'] || $other['available']) { continue; } ?>
+                <div class="ef-plan-future">
+                  <span class="ef-eyebrow"><?= e($other['label']) ?> &middot; not available</span>
+                  <p><?= e($other['summary']) ?></p>
+                  <ul class="ef-plan-includes ef-plan-includes-muted">
+                    <?php foreach ($other['includes'] as $feature): ?>
+                      <li><?= e($feature) ?></li>
+                    <?php endforeach; ?>
+                  </ul>
+                </div>
+              <?php endforeach; ?>
+
+              <p class="ef-legal-note" style="font-size:12px;margin-top:14px;">
+                <?= e(subscription_cost_statement()) ?>
+              </p>
+            </section>
+
             <section class="ef-card ef-card-lg">
               <div class="ef-card-title" style="margin-bottom:14px;">Account</div>
               <div class="ef-list-meta" style="margin-bottom:4px;">Status</div>

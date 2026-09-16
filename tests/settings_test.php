@@ -92,7 +92,8 @@ CREATE TABLE activity_item (
   item_id INTEGER PRIMARY KEY AUTOINCREMENT,
   activity_id INTEGER NOT NULL REFERENCES learning_activity(activity_id) ON DELETE CASCADE,
   question_text TEXT NOT NULL, item_type TEXT NOT NULL, options_json TEXT NULL,
-  correct_answer TEXT NOT NULL, explanation TEXT NULL);
+  correct_answer TEXT NOT NULL, explanation TEXT NULL,
+  topic_progress_id INTEGER NULL, bloom_level TEXT NULL);
 CREATE TABLE activity_attempt (
   attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES user(user_id) ON DELETE CASCADE,

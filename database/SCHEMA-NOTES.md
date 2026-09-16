@@ -1,6 +1,6 @@
 # Schema notes
 
-`01_schema.sql` follows the Chapter III data dictionary (Tables 4 to 15). Seven
+`01_schema.sql` follows the Chapter III data dictionary (Tables 4 to 15). Eight
 things differ, and Chapter III should be amended to match before your final
 defense. Each one is a gap in the documented design, not a preference.
 
@@ -119,6 +119,29 @@ Two questions a panelist might ask:
    page only through `app/actions/avatar_show.php`. That endpoint takes no user
    id at all: it serves the session's own picture, so there is no parameter for
    anybody to change. See README section 6f.
+
+## 8. `activity_item.topic_progress_id` and `activity_item.bloom_level` -- ADDED
+
+Two nullable columns on `activity_item`, added when Generate Mock Examinations
+was built.
+
+Until then an item's topic and Bloom level came from its activity, because a
+practice set is one topic at one level. A mock examination is neither: it spans
+several topics and several levels by design, so each item has to say which topic
+it is evidence for and how hard it was.
+
+Everything that reads them uses the item's value and falls back to the
+activity's. A practice set leaves both NULL and behaves exactly as before, which
+is why adding these changed no existing mastery figure. `tests/attempts_test.php`
+passed unaltered across the change, and that is the evidence.
+
+One implementation note worth keeping, because it cost an hour. The natural way
+to write the fallback is `COALESCE(ai.topic_progress_id, la.topic_progress_id) = ?`.
+Do not. SQLite takes type affinity from the column on the left of a comparison,
+and `COALESCE(...)` is an expression with no affinity, so the bound parameter
+stays TEXT `'1'` and never matches INTEGER `1`. Every mastery score silently
+became zero. MySQL coerces the two and hides it. `mastery_recalculate()` compares
+each column to the parameter separately for that reason.
 
 ---
 

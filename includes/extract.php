@@ -86,8 +86,15 @@ function extract_text(string $path, string $extension): array
     // the middle of words, which is rare in real prose and common in this
     // failure. Warn rather than reject; the text is still partly usable.
     if ($engine === 'built-in') {
-        $confidence = pdf_text_confidence($text);
-        if ($confidence < 0.85) {
+        /* Two independent checks, because they catch different failures and
+           each is blind to the other's. See pdf_text_looks_garbled(). */
+        if (pdf_text_looks_garbled($text)) {
+            $result['warning'] =
+                'The text in this PDF could not be decoded. What was extracted is '
+                . 'not readable, so any questions generated from it would be '
+                . 'meaningless. Upload the document as .docx instead, or install '
+                . 'the PDF library (composer require smalot/pdfparser).';
+        } elseif (pdf_text_confidence($text) < 0.85) {
             $result['warning'] =
                 'Some characters may be decoded incorrectly. For accurate text, '
                 . 'install the PDF library (composer require smalot/pdfparser) '
@@ -135,6 +142,93 @@ function pdf_text_confidence(string $text): float
     }
 
     return 1.0 - ($suspect / $total);
+}
+
+/**
+ * Does this look like text the built-in reader failed to decode at all?
+ *
+ * pdf_text_confidence() above detects ONE failure mode: two subset fonts
+ * colliding on glyph ids, which leaves capitals stranded inside words
+ * ("DnivErsity"). It is blind to a second and worse one.
+ *
+ * When a PDF embeds a subset font with its own encoding and no ToUnicode map,
+ * every letter comes out shifted by a fixed amount. "art appreciation" became
+ * "$UW$SSUHFLDWLRQ" in one font on a real upload and "BSU BQQSFDJBUJPO" in
+ * another. Those are all capitals, so the acronym exemption in
+ * pdf_text_confidence() skipped every single word and the whole document scored
+ * a perfect 1.000. EduFlex accepted it, chunked it, and would have sent it to a
+ * language model to write practice questions from gibberish.
+ *
+ * Two signals, measured against real samples rather than guessed:
+ *
+ *   Words run together. Spacing is usually lost along with the encoding, so the
+ *   mean run of letters was 16.0 characters against 5.4 for English prose, 4.7
+ *   for Filipino, and 5.9 for an all-capitals slide deck. This is the strong
+ *   one, and it cares about neither language nor capitalisation.
+ *
+ *   Shouting with no recognisable words. If spacing survives, the giveaway is
+ *   text that is almost entirely capitals AND contains none of the short words
+ *   every real sentence is built from. A genuine all-capitals slide deck fails
+ *   only the first half of that test, so it is not flagged. The word list
+ *   covers English and Filipino, because that is what this system's learners
+ *   upload.
+ *
+ * A warning, never a rejection, exactly like the check above: the learner is
+ * told to install the PDF library or upload a .docx, and keeps whatever text
+ * was recovered.
+ */
+function pdf_text_looks_garbled(string $text): bool
+{
+    // Too little to judge. A short extract is handled by EXTRACT_MIN_CHARS.
+    if (mb_strlen($text) < 200) {
+        return false;
+    }
+
+    /* Enough letters to judge, rather than enough tokens. The first version
+       demanded 20 tokens and that worked against the check: text whose words
+       have run together has FEW tokens by definition, so a badly garbled page
+       could slip through for having too few of them. Letters are the honest
+       measure of how much there is to go on. */
+    if (preg_match_all('/[A-Za-z]/', $text) < 150) {
+        return false;
+    }
+
+    /* Only enough to divide by. Do not add a minimum token count here: text
+       whose words have run together has very few tokens BY DEFINITION, and a
+       page of four 81-character runs is the clearest garbling there is. A
+       "< 5 tokens" guard was tried and rejected exactly that sample. The 150
+       letters above is what stops a scrap being judged. */
+    if (!preg_match_all('/[A-Za-z]{2,}/', $text, $matches)) {
+        return false;
+    }
+
+    $tokens = $matches[0];
+    $meanRun = array_sum(array_map('strlen', $tokens)) / count($tokens);
+
+    // Measured: 16.0 garbled, 6.2 the worst legitimate sample. Sits between.
+    if ($meanRun >= 11.0) {
+        return true;
+    }
+
+    $letters = preg_match_all('/[A-Za-z]/', $text);
+    $upper   = preg_match_all('/[A-Z]/', $text);
+    if ($letters === 0) {
+        return false;
+    }
+
+    $upperRatio = $upper / $letters;
+
+    /* The short words every real sentence leans on, in the two languages this
+       system's learners write in. An all-capitals deck has plenty; shifted
+       gibberish has none, because the shift destroys them too. */
+    $common = preg_match_all(
+        '/\b(the|and|of|to|in|is|that|for|with|are|as|it|by|be|on|or|from|this|which|can'
+        . '|ang|ng|sa|na|mga|ay|at|para|ito|ang|kung|hindi)\b/i',
+        $text
+    );
+    $perThousand = ($common / mb_strlen($text)) * 1000;
+
+    return $upperRatio >= 0.80 && $perThousand < 5.0;
 }
 
 function extract_fail(string $message, string $engine = 'none'): array

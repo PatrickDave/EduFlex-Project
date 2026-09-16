@@ -20,22 +20,20 @@ declare(strict_types=1);
    Chapter III, Functional Decomposition Diagram (Figure 11) and the List of
    Modules: seven modules and 34 sub-modules in total.
 
-   TWO SUB-MODULES ARE DELIBERATELY ABSENT FROM THIS ARRAY, because they are
-   listed in the manuscript but not implemented, and a public page must not
-   claim a feature that does not exist:
+   ALL 34 SUB-MODULES ARE NOW LISTED. Two were absent until 16 September 2026
+   because they were in the manuscript and not in the code, and a public page
+   must not claim a feature that does not exist. Both were built that day:
 
-     Account and Access Management 5, "Manage Subscription". EduFlex is
-     non-commercial per Chapter I. A subscription row is written at
-     registration to satisfy the documented ERD, and there is no way to manage
-     one because there is nothing to manage.
+     Account and Access Management 5, "Manage Subscription", is the plan card on
+     Settings, backed by includes/subscription.php. Nothing can be purchased;
+     the card states the learner's plan and that EduFlex never charges.
 
-     Learning Activity and Assessment 2, "Generate Mock Examinations". The only
-     activity type the system stores is 'practice_set'. There is no separate
-     mock-examination path anywhere in includes/questions.php.
+     Learning Activity and Assessment 2, "Generate Mock Examinations", is
+     includes/exams.php. An examination spans several topics, reuses questions
+     the learner has not been asked, and generates only the shortfall.
 
-   Both are flagged in CLAUDE.md. Either build them before the freeze or record
-   them in Chapter V as future work; do not add them here to make the count
-   reach 34.
+   If a sub-module is ever listed here before it works, tests/manuscript_test.php
+   is the place to add the guard that catches it.
    ------------------------------------------------------------------------- */
 
 /** @var list<array{title:string, blurb:string, items:list<string>}> */
@@ -44,7 +42,8 @@ const MANUSCRIPT_MODULES = [
         'title' => 'Account and Access Management',
         'blurb' => 'Your account, your details, and getting in and out safely.',
         'items' => ['Register an account', 'Sign in', 'Manage profile',
-                    'Manage password and settings', 'Sign out'],
+                    'Manage password and settings', 'Manage subscription',
+                    'Sign out'],
     ],
     [
         'title' => 'Learning Resource Management',
@@ -61,7 +60,8 @@ const MANUSCRIPT_MODULES = [
     [
         'title' => 'Learning Activity and Assessment',
         'blurb' => 'Practice written from your material and tagged to a level of thinking.',
-        'items' => ["Generate practice activities",
+        'items' => ['Generate practice activities',
+                    'Generate mock examinations',
                     "Generate Bloom's Taxonomy-aligned questions",
                     'Complete assessments', 'View results and feedback'],
     ],

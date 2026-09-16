@@ -11,6 +11,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/stats.php';
 require_once __DIR__ . '/../includes/questions.php';
+require_once __DIR__ . '/../includes/exams.php';
 auth_require_login();
 
 $user   = auth_user();
@@ -43,6 +44,9 @@ $activities = questions_activity_list($uid, 20);
 $genTopics  = questions_generatable_topics($uid, 20);
 $reco       = stats_recommendation($uid);
 $flashError = flash_get('error');
+$flashOk    = flash_get('practice_ok');
+$examReady  = exam_is_available($uid);
+$pastExams  = exam_list($uid, 5);
 ?>
       <div class="ef-content">
 
@@ -55,6 +59,38 @@ $flashError = flash_get('error');
 
         <?php if ($flashError): ?>
           <div class="ef-alert ef-alert-error"><?= e((string) $flashError) ?></div>
+        <?php endif; ?>
+        <?php if ($flashOk): ?>
+          <div class="ef-alert ef-alert-ok"><?= e((string) $flashOk) ?></div>
+        <?php endif; ?>
+
+        <?php
+        /* Learning Activity and Assessment 2: Generate Mock Examinations.
+           Offered only when exam_is_available() says there are enough topics,
+           so the button is never shown to somebody it would refuse. */
+        ?>
+        <?php if ($examReady): ?>
+          <section class="ef-card ef-card-lg ef-exam-cta">
+            <div class="ef-exam-cta-main">
+              <div class="ef-card-title" style="margin-bottom:6px;">Mock examination</div>
+              <p class="ef-second" style="font-size:12.5px;line-height:1.6;margin:0;">
+                <?= (int) EXAM_QUESTION_COUNT ?> questions drawn across your weakest topics,
+                the way an exam covers a whole course rather than one lesson. EduFlex uses
+                questions you have not answered yet and only generates what it cannot fill,
+                so this is usually instant and free.
+              </p>
+              <?php if ($pastExams): ?>
+                <p class="ef-list-meta" style="margin-top:8px;">
+                  You have taken <?= count($pastExams) ?>
+                  <?= count($pastExams) === 1 ? 'examination' : 'examinations' ?> so far.
+                </p>
+              <?php endif; ?>
+            </div>
+            <form method="post" action="actions/exam_start.php" style="margin:0;">
+              <?= csrf_field() ?>
+              <button class="ef-btn ef-btn-primary" type="submit">Start a mock examination</button>
+            </form>
+          </section>
         <?php endif; ?>
 
         <?php if ($stage['processed'] === 0): ?>

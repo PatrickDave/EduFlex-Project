@@ -10,6 +10,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/attempts.php';
+require_once __DIR__ . '/../includes/exams.php';
 
 /* The shell prints markup as soon as the body runs, so the attempt has to be
    resolved here, while a redirect is still possible. auth_require_login()
@@ -55,7 +56,12 @@ $items     = $runner['items'];
 $attemptId = (int) $attempt['attempt_id'];
 $finished  = $attempt['completed_at'] !== null;
 $total     = count($items);
-$topicName = $attempt['topic_name'] !== null ? (string) $attempt['topic_name'] : 'Untitled topic';
+$isExam    = exam_is_exam($attempt['activity_type'] ?? null);
+/* An examination belongs to no single topic, so there is no topic name to show.
+   It gets its per-topic breakdown on the result screen instead. */
+$topicName = $attempt['topic_name'] !== null
+    ? (string) $attempt['topic_name']
+    : ($isExam ? 'Several topics' : 'Untitled topic');
 ?>
       <div class="ef-content">
 
@@ -103,9 +109,55 @@ $topicName = $attempt['topic_name'] !== null ? (string) $attempt['topic_name'] :
               <?= $correct ?> of <?= $total ?> correct
             </p>
             <p class="ef-second" style="font-size:12.5px;">
-              <?= e($topicName) ?> &middot; <?= e((string) $attempt['bloom_level']) ?> level
+              <?= e($topicName) ?>
+              <?php if (!$isExam): ?>
+                &middot; <?= e((string) $attempt['bloom_level']) ?> level
+              <?php endif; ?>
             </p>
           </section>
+
+          <?php
+          /* An examination covers several topics, so one number hides the thing
+             the learner most needs: which topic let them down. Every answer has
+             already gone into that topic's mastery; this is the same evidence
+             shown per topic while it is still in front of them. */
+          ?>
+          <?php if ($isExam): ?>
+            <?php $breakdown = exam_topic_breakdown($attemptId, $uid); ?>
+            <?php if ($breakdown): ?>
+              <section class="ef-card ef-card-lg" style="margin-top:20px;">
+                <div class="ef-card-title" style="margin-bottom:6px;">By topic</div>
+                <div class="ef-card-sub" style="margin-bottom:16px;">
+                  Where the marks went, and where to practise next
+                </div>
+                <div style="overflow-x:auto;">
+                  <table class="ef-table">
+                    <thead><tr><th>Topic</th><th>Correct</th><th>Share</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($breakdown as $row): ?>
+                      <?php
+                        $pct  = $row['answered'] > 0
+                              ? ($row['correct'] / $row['answered']) * 100 : 0.0;
+                        $band = mastery_band($pct, MASTERY_MIN_ITEMS);
+                      ?>
+                      <tr>
+                        <td><?= e($row['topic']) ?></td>
+                        <td><?= (int) $row['correct'] ?> of <?= (int) $row['answered'] ?></td>
+                        <td>
+                          <span class="ef-band ef-band-<?= e($band) ?>"><?= round($pct) ?>%</span>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="ef-legal-note" style="font-size:12px;margin-top:14px;">
+                  Every answer above counted toward that topic's mastery, at the same
+                  weighting a practice answer carries.
+                </p>
+              </section>
+            <?php endif; ?>
+          <?php endif; ?>
 
           <?php if ($mastery !== null): ?>
             <?php

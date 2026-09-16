@@ -1558,6 +1558,64 @@ p { margin: 0; }
 }
 .ef-references a:hover { text-decoration: underline; }
 
+/* The mock examination call to action on the Practice screen. Text and button
+   side by side on a wide screen, stacked once there is no room. */
+.ef-exam-cta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  border-color: var(--ef-primary-bright);
+  background: linear-gradient(135deg, var(--ef-surface) 0%, var(--ef-surface-sky) 100%);
+}
+.ef-exam-cta-main { flex: 1 1 320px; min-width: 0; }
+
+/* --------------------------------------------------------------------------
+   14e. PLAN CARD (Settings, Manage Subscription)
+   -------------------------------------------------------------------------- */
+.ef-plan-includes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ef-plan-includes li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ef-text-2);
+  margin-bottom: 7px;
+}
+.ef-plan-includes li:last-child { margin-bottom: 0; }
+/* The same CSS tick as the landing page module lists, per rule 3. */
+.ef-plan-includes li::before {
+  content: '';
+  position: absolute;
+  left: 2px; top: 6px;
+  width: 4px; height: 8px;
+  border: solid var(--ef-mastered);
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(45deg);
+}
+
+/* A tier that is designed and not offered. Deliberately muted and greyed:
+   nothing here is a call to action, because there is nothing to buy. */
+.ef-plan-future {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--ef-border);
+  opacity: .72;
+}
+.ef-plan-future p {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ef-text-muted);
+  margin: 6px 0 10px;
+}
+.ef-plan-includes-muted li { color: var(--ef-text-muted); }
+.ef-plan-includes-muted li::before { border-color: var(--ef-text-muted); }
+
 /* Auth */
 .ef-auth-page {
   min-height: 100vh;

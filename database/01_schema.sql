@@ -240,10 +240,21 @@ CREATE TABLE activity_item (
   options_json   JSON            NULL DEFAULT NULL,
   correct_answer TEXT        NOT NULL,
   explanation    TEXT            NULL DEFAULT NULL,
+  -- ADDED, both nullable. A practice set belongs to one topic at one Bloom
+  -- level, so its items leave these NULL and inherit from the activity. A mock
+  -- examination spans several topics and several levels, so ITS items carry
+  -- their own. Everything that reads them uses
+  -- COALESCE(item value, activity value), which is why adding these changed no
+  -- existing behaviour. See SCHEMA-NOTES.md 8.
+  topic_progress_id INT(11)     NULL DEFAULT NULL,
+  bloom_level       VARCHAR(20) NULL DEFAULT NULL,
   PRIMARY KEY (item_id),
   KEY idx_item_activity (activity_id),
+  KEY idx_item_topic (topic_progress_id),
   CONSTRAINT fk_item_activity FOREIGN KEY (activity_id)
-    REFERENCES learning_activity (activity_id) ON DELETE CASCADE
+    REFERENCES learning_activity (activity_id) ON DELETE CASCADE,
+  CONSTRAINT fk_item_topic FOREIGN KEY (topic_progress_id)
+    REFERENCES topic_progress (topic_progress_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 

@@ -247,9 +247,9 @@ Open a terminal in the project folder:
     C:\xampp\php\php.exe tests\rubric_test.php
     C:\xampp\php\php.exe tests\legal_test.php
 
-Expect `Passed: 40`, `32`, `63`, `73`, `81`, `69`, `77`, `39`, `60`, `79`, `87`,
-`69`, `76` and `36`, all with `Failed: 0`, for 881 checks in total. On Mac or Linux,
-`./run_tests.sh` runs all fourteen. None needs a database, a web server, an API
+Expect `Passed: 40`, `44`, `63`, `73`, `81`, `69`, `77`, `39`, `60`, `79`, `87`,
+`69`, `76`, `39`, `48` and `46`, all with `Failed: 0`, for 990 checks in total. On Mac or Linux,
+`./run_tests.sh` runs all sixteen. None needs a database, a web server, an API
 key or an internet connection.
 
 One exception to that. 5 of the 32 extraction checks build a .docx fixture,

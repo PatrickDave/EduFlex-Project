@@ -53,3 +53,20 @@ CREATE TABLE IF NOT EXISTS login_attempt (
 ALTER TABLE user
   ADD COLUMN IF NOT EXISTS avatar_path VARCHAR(255) NULL DEFAULT NULL
   AFTER account_status;
+
+
+-- ---------------------------------------------------------------------------
+-- 2026-09-16  Mock examinations.
+--
+-- An examination spans several topics and several Bloom levels, and until now
+-- an item's topic and level came only from its activity. These two nullable
+-- columns let an item carry its own. A practice set leaves them NULL and
+-- behaves exactly as before. See SCHEMA-NOTES.md section 8.
+-- ---------------------------------------------------------------------------
+ALTER TABLE activity_item
+  ADD COLUMN IF NOT EXISTS topic_progress_id INT(11) NULL DEFAULT NULL
+  AFTER explanation;
+
+ALTER TABLE activity_item
+  ADD COLUMN IF NOT EXISTS bloom_level VARCHAR(20) NULL DEFAULT NULL
+  AFTER topic_progress_id;

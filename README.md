@@ -63,6 +63,10 @@ eduflex-ui/
                            value is unfilled
     manuscript.php         The seven modules and the reference list, taken from
                            the manuscript, rendered on the landing page
+    subscription.php       Plans, the free and premium tiers, and the one
+                           sentence every screen uses about cost
+    exams.php              Mock examinations: topic choice, assembly from
+                           stored questions, per-topic breakdown
   partials/
     sidebar.php            Sidebar markup, one copy for every page
     topbar.php             Header markup, one copy for every page
@@ -73,12 +77,13 @@ eduflex-ui/
                            DROP DATABASE.
     02_migrations.sql      The same changes as safe, re-runnable ALTERs, for a
                            database that already has data in it.
-    SCHEMA-NOTES.md        Seven deviations from Chapter III, and why each one
+    SCHEMA-NOTES.md        Eight deviations from Chapter III, and why each one
   tests/
     auth_test.php          40 checks
-    extract_test.php       32 checks (5 of them need the PHP zip extension;
+    extract_test.php       44 checks (5 of them need the PHP zip extension;
                            without it the DOCX block reports SKIP and the
-                           suite reports 27)
+                           suite reports 39). Includes the garbled-PDF
+                           detector and the cases it must not accuse.
     ai_test.php            63 checks
     questions_test.php     73 checks
     attempts_test.php      81 checks, including the mastery arithmetic
@@ -98,8 +103,11 @@ eduflex-ui/
     legal_test.php         76 checks that the consent documents are public,
                            linked everywhere, and that the adviser's personal
                            number is not published
-    manuscript_test.php    36 checks that every nav link resolves and that no
+    manuscript_test.php    39 checks that every nav link resolves and that no
                            unbuilt module is advertised
+    subscription_test.php  48 checks, including that no plan offers a purchase
+    exams_test.php         46 checks, including that a fully stocked exam makes
+                           zero provider calls
     runner_browser_test.py 54 checks against a running system (Playwright)
     chat_browser_test.py   29 checks against a running system (Playwright)
   assets/
@@ -534,6 +542,35 @@ Four things about it are deliberate:
 
 Nothing is thrown away: the sets a rubric run generates are stored like any
 other, so the learner ends up with real practice material.
+
+## 6h. Mock examinations
+
+`includes/exams.php`. Chapter III defines this as creating "practice
+examinations ... to help learners assess their understanding and prepare for
+academic assessments", so it covers ground rather than drilling one topic:
+20 questions across up to three topics, weakest first.
+
+**It assembles before it generates, and that is the whole design.** Generation is
+one provider call per set of eight, so writing a 20-question exam from scratch
+would cost three calls every single time. Instead it takes questions the learner
+has not been asked from sets that already exist and calls the provider only for
+the shortfall. A learner who has practised for a while gets an exam instantly and
+for nothing, and the flash message says which it was.
+
+**A question already asked never comes back.** The exclusion matches on question
+text rather than item id, because building an exam copies the chosen questions
+into the exam's own activity. Answering the copy leaves the original untouched,
+so an id-based check served the same question again next time. The test suite
+caught that before it shipped.
+
+**Exam answers count toward mastery exactly like practice answers**, at the same
+Bloom and recency weighting, for every topic the exam touched. That is what
+`activity_item.topic_progress_id` and `activity_item.bloom_level` are for: the
+exam activity belongs to no single topic, so each item says which topic it is
+evidence for. A practice set leaves both NULL and is entirely unaffected.
+
+The result screen shows the per-topic breakdown, because one number from a
+20-question exam hides the thing the learner most needs to know.
 
 ## 7. What was deliberately left out
 

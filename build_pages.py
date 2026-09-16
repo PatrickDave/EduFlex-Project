@@ -715,6 +715,9 @@ $activities = questions_activity_list($uid, 20);
 $genTopics  = questions_generatable_topics($uid, 20);
 $reco       = stats_recommendation($uid);
 $flashError = flash_get('error');
+$flashOk    = flash_get('practice_ok');
+$examReady  = exam_is_available($uid);
+$pastExams  = exam_list($uid, 5);
 ?>
       <div class="ef-content">
 
@@ -727,6 +730,38 @@ $flashError = flash_get('error');
 
         <?php if ($flashError): ?>
           <div class="ef-alert ef-alert-error"><?= e((string) $flashError) ?></div>
+        <?php endif; ?>
+        <?php if ($flashOk): ?>
+          <div class="ef-alert ef-alert-ok"><?= e((string) $flashOk) ?></div>
+        <?php endif; ?>
+
+        <?php
+        /* Learning Activity and Assessment 2: Generate Mock Examinations.
+           Offered only when exam_is_available() says there are enough topics,
+           so the button is never shown to somebody it would refuse. */
+        ?>
+        <?php if ($examReady): ?>
+          <section class="ef-card ef-card-lg ef-exam-cta">
+            <div class="ef-exam-cta-main">
+              <div class="ef-card-title" style="margin-bottom:6px;">Mock examination</div>
+              <p class="ef-second" style="font-size:12.5px;line-height:1.6;margin:0;">
+                <?= (int) EXAM_QUESTION_COUNT ?> questions drawn across your weakest topics,
+                the way an exam covers a whole course rather than one lesson. EduFlex uses
+                questions you have not answered yet and only generates what it cannot fill,
+                so this is usually instant and free.
+              </p>
+              <?php if ($pastExams): ?>
+                <p class="ef-list-meta" style="margin-top:8px;">
+                  You have taken <?= count($pastExams) ?>
+                  <?= count($pastExams) === 1 ? 'examination' : 'examinations' ?> so far.
+                </p>
+              <?php endif; ?>
+            </div>
+            <form method="post" action="actions/exam_start.php" style="margin:0;">
+              <?= csrf_field() ?>
+              <button class="ef-btn ef-btn-primary" type="submit">Start a mock examination</button>
+            </form>
+          </section>
         <?php endif; ?>
 
         <?php if ($stage['processed'] === 0): ?>
@@ -1570,6 +1605,7 @@ $avatarOk    = flash_get('avatar_ok');
 $avatarErr   = flash_get('avatar_error');
 
 $hasAvatar = avatar_has($uid);
+$plan      = subscription_for($uid);
 ?>
       <div class="ef-content">
 
@@ -1794,6 +1830,54 @@ $hasAvatar = avatar_has($uid);
           </div>
 
           <div class="ef-col-fixed-360 ef-stack">
+            <?php
+            /* Account and Access Management 5: Manage Subscription. The
+               subscription row has existed since registration; this is the
+               first thing that reads it. There is nothing to buy, so the card
+               states the plan, what it includes, and that EduFlex will never
+               ask for money. The premium tier is shown as designed and
+               unavailable because the Chapter III data dictionary defines
+               plan_type as "free or premium"; see includes/subscription.php. */
+            ?>
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-head" style="margin-bottom:6px;">
+                <div class="ef-card-title">Your plan</div>
+                <span class="ef-band ef-band-<?= e(subscription_status_band($plan['status'])) ?>">
+                  <?= e($plan['label']) ?>
+                </span>
+              </div>
+              <div class="ef-card-sub" style="margin-bottom:14px;">
+                <?= e(subscription_since($plan)) ?>
+              </div>
+
+              <p class="ef-second" style="font-size:12.5px;line-height:1.6;margin-bottom:12px;">
+                <?= e($plan['summary']) ?>
+              </p>
+
+              <ul class="ef-plan-includes">
+                <?php foreach ($plan['includes'] as $feature): ?>
+                  <li><?= e($feature) ?></li>
+                <?php endforeach; ?>
+              </ul>
+
+              <?php foreach (SUBSCRIPTION_PLANS as $key => $other): ?>
+                <?php if ($key === $plan['plan'] || $other['available']) { continue; } ?>
+                <div class="ef-plan-future">
+                  <span class="ef-eyebrow"><?= e($other['label']) ?> &middot; not available</span>
+                  <p><?= e($other['summary']) ?></p>
+                  <ul class="ef-plan-includes ef-plan-includes-muted">
+                    <?php foreach ($other['includes'] as $feature): ?>
+                      <li><?= e($feature) ?></li>
+                    <?php endforeach; ?>
+                  </ul>
+                </div>
+              <?php endforeach; ?>
+
+              <p class="ef-legal-note" style="font-size:12px;margin-top:14px;">
+                <?= e(subscription_cost_statement()) ?>
+              </p>
+            </section>
+
             <section class="ef-card ef-card-lg">
               <div class="ef-card-title" style="margin-bottom:14px;">Account</div>
               <div class="ef-list-meta" style="margin-bottom:4px;">Status</div>
@@ -2207,6 +2291,7 @@ STATS = "require_once __DIR__ . '/../includes/stats.php';"
 # open. They arrive one at a time in the reply to actions/attempt_answer.php.
 # ============================================================================
 PRACTICE_RUN_REQUIRES = """require_once __DIR__ . '/../includes/attempts.php';
+require_once __DIR__ . '/../includes/exams.php';
 
 /* The shell prints markup as soon as the body runs, so the attempt has to be
    resolved here, while a redirect is still possible. auth_require_login()
@@ -2228,7 +2313,12 @@ $items     = $runner['items'];
 $attemptId = (int) $attempt['attempt_id'];
 $finished  = $attempt['completed_at'] !== null;
 $total     = count($items);
-$topicName = $attempt['topic_name'] !== null ? (string) $attempt['topic_name'] : 'Untitled topic';
+$isExam    = exam_is_exam($attempt['activity_type'] ?? null);
+/* An examination belongs to no single topic, so there is no topic name to show.
+   It gets its per-topic breakdown on the result screen instead. */
+$topicName = $attempt['topic_name'] !== null
+    ? (string) $attempt['topic_name']
+    : ($isExam ? 'Several topics' : 'Untitled topic');
 ?>
       <div class="ef-content">
 
@@ -2276,9 +2366,55 @@ $topicName = $attempt['topic_name'] !== null ? (string) $attempt['topic_name'] :
               <?= $correct ?> of <?= $total ?> correct
             </p>
             <p class="ef-second" style="font-size:12.5px;">
-              <?= e($topicName) ?> &middot; <?= e((string) $attempt['bloom_level']) ?> level
+              <?= e($topicName) ?>
+              <?php if (!$isExam): ?>
+                &middot; <?= e((string) $attempt['bloom_level']) ?> level
+              <?php endif; ?>
             </p>
           </section>
+
+          <?php
+          /* An examination covers several topics, so one number hides the thing
+             the learner most needs: which topic let them down. Every answer has
+             already gone into that topic's mastery; this is the same evidence
+             shown per topic while it is still in front of them. */
+          ?>
+          <?php if ($isExam): ?>
+            <?php $breakdown = exam_topic_breakdown($attemptId, $uid); ?>
+            <?php if ($breakdown): ?>
+              <section class="ef-card ef-card-lg" style="margin-top:20px;">
+                <div class="ef-card-title" style="margin-bottom:6px;">By topic</div>
+                <div class="ef-card-sub" style="margin-bottom:16px;">
+                  Where the marks went, and where to practise next
+                </div>
+                <div style="overflow-x:auto;">
+                  <table class="ef-table">
+                    <thead><tr><th>Topic</th><th>Correct</th><th>Share</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($breakdown as $row): ?>
+                      <?php
+                        $pct  = $row['answered'] > 0
+                              ? ($row['correct'] / $row['answered']) * 100 : 0.0;
+                        $band = mastery_band($pct, MASTERY_MIN_ITEMS);
+                      ?>
+                      <tr>
+                        <td><?= e($row['topic']) ?></td>
+                        <td><?= (int) $row['correct'] ?> of <?= (int) $row['answered'] ?></td>
+                        <td>
+                          <span class="ef-band ef-band-<?= e($band) ?>"><?= round($pct) ?>%</span>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="ef-legal-note" style="font-size:12px;margin-top:14px;">
+                  Every answer above counted toward that topic's mastery, at the same
+                  weighting a practice answer carries.
+                </p>
+              </section>
+            <?php endif; ?>
+          <?php endif; ?>
 
           <?php if ($mastery !== null): ?>
             <?php
@@ -2567,14 +2703,16 @@ PAGES = [
      "require_once __DIR__ . '/../includes/resources.php';\n"
      "require_once __DIR__ . '/../includes/topics.php';"),
     ("practice.php",  "Practice",              "practice",  PRACTICE,
-     STATS + "\nrequire_once __DIR__ . '/../includes/questions.php';"),
+     STATS + "\nrequire_once __DIR__ . '/../includes/questions.php';"
+           + "\nrequire_once __DIR__ . '/../includes/exams.php';"),
     ("practice_run.php", "Practice",           "practice",  PRACTICE_RUN,
      PRACTICE_RUN_REQUIRES),
     ("growth.php",    "Growth Insights",       "growth",    GROWTH,    STATS),
     ("scores.php",    "Monitor Scores",        "scores",    SCORES,    STATS),
     ("history.php",   "Review History",        "history",   HISTORY,   STATS),
     ("settings.php",  "Profile Settings",      "settings",  SETTINGS,
-     STATS + "\nrequire_once __DIR__ . '/../includes/avatar.php';"),
+     STATS + "\nrequire_once __DIR__ . '/../includes/avatar.php';"
+           + "\nrequire_once __DIR__ . '/../includes/subscription.php';"),
     ("notifications.php", "Notifications",     "",          NOTIFICATIONS,
      "require_once __DIR__ . '/../includes/notifications.php';"),
     ("support.php",   "Support",               "support",   SUPPORT,
