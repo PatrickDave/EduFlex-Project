@@ -1205,6 +1205,207 @@ p { margin: 0; }
 }
 .ef-public .ef-btn-ghost:hover svg { transform: translateX(3px); }
 
+/* ---- The explainer video ------------------------------------------------
+
+   A 1920x1080 file, so the frame holds 16/9 and the video fills it. The frame
+   carries the radius and clips, because a video element ignores border-radius
+   on its own in some engines and shows square corners over a rounded box.
+
+   The dark ground is deliberate: it is what shows before the first frame is
+   decoded and behind the letterboxing if the source is ever not 16/9, and a
+   dark band reads as part of the player rather than as a rendering fault.
+
+   No lift on hover. The step cards rise because they are decorative; this one
+   holds controls a cursor is travelling towards, and moving it out from under
+   the pointer is the classic way to make a play button hard to hit.
+   -------------------------------------------------------------------------- */
+
+.ef-video-figure {
+  margin: 0 auto 34px;
+  max-width: 940px;
+}
+
+/* ---- The poster, which is a button ---- */
+
+.ef-video-trigger {
+  display: block;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--ef-border);
+  border-radius: var(--ef-r-lg);
+  background: var(--ef-deep);
+  box-shadow: var(--ef-shadow-md);
+  transition: border-color .28s ease, box-shadow .28s ease;
+}
+.ef-video-trigger:hover,
+.ef-video-trigger:focus-visible {
+  border-color: var(--ef-primary-bright);
+  box-shadow: var(--ef-shadow-lg);
+}
+.ef-video-trigger:focus-visible {
+  outline: 2px solid var(--ef-primary-bright);
+  outline-offset: 2px;
+}
+.ef-video-trigger img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .45s cubic-bezier(.22, 1, .36, 1);
+}
+.ef-video-trigger:hover img { transform: scale(1.03); }
+
+/* The badge is the affordance. It sits above a light poster, so it is a solid
+   white disc with the brand colour inside rather than a translucent one, which
+   would lose contrast the moment the frame behind it changes. */
+.ef-video-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 78px;
+  height: 78px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ef-primary);
+  box-shadow: var(--ef-shadow-lg);
+  transition: transform .3s cubic-bezier(.34, 1.56, .64, 1),
+              background .3s ease, color .3s ease;
+}
+/* The triangle is optically centred, not geometrically: a play glyph with equal
+   padding reads as sitting too far left. */
+.ef-video-play svg { margin-left: 4px; }
+
+.ef-video-trigger:hover .ef-video-play,
+.ef-video-trigger:focus-visible .ef-video-play {
+  transform: translate(-50%, -50%) scale(1.08);
+  background: var(--ef-primary);
+  color: var(--ef-on-primary);
+}
+
+.ef-video-duration {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 3px 9px;
+  border-radius: var(--ef-r-pill);
+  background: rgba(15, 23, 42, .78);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+
+.ef-video-caption {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ef-text-muted);
+}
+
+/* ---- The dialog ----
+
+   The <dialog> element itself is the full-screen backdrop, which is why the
+   click handler in initVideoDialog() can treat "target is the dialog" as
+   "clicked outside the panel". The UA rule dialog:not([open]) { display: none }
+   still does the hiding, so display is set on [open] only.
+   ---------------------------------------------------------------------- */
+
+.ef-video-dialog {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: clamp(16px, 4vw, 56px);
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+}
+.ef-video-dialog[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ef-video-dialog::backdrop {
+  background: rgba(8, 15, 30, .82);
+  backdrop-filter: blur(3px);
+}
+
+.ef-video-dialog-panel {
+  position: relative;
+  width: 100%;
+  max-width: 1120px;
+  aspect-ratio: 16 / 9;
+  max-height: 100%;
+  overflow: hidden;
+  border-radius: var(--ef-r-lg);
+  background: #000;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .55);
+  animation: ef-video-in .32s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes ef-video-in {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.ef-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* Inside the panel rather than floating above it, so it cannot be pushed off
+   the top of a short landscape phone screen. */
+.ef-video-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, .6);
+  color: #fff;
+  transition: background .2s ease, transform .2s ease;
+}
+.ef-video-close:hover { background: rgba(15, 23, 42, .9); transform: scale(1.06); }
+.ef-video-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* The page behind a modal should not scroll under it. showModal() makes the
+   rest of the document inert but does not stop the scroll in every engine. */
+.ef-no-scroll { overflow: hidden; }
+
+/* Older engines without aspect-ratio would collapse both boxes to nothing,
+   hiding the video rather than merely styling it badly. */
+@supports not (aspect-ratio: 16 / 9) {
+  .ef-video-trigger,
+  .ef-video-dialog-panel { height: 0; padding-bottom: 56.25%; }
+  .ef-video-trigger img,
+  .ef-video { position: absolute; inset: 0; }
+}
+
 /* ---- The four step cards ------------------------------------------------ */
 
 /* Only on a landing card. The same class inside the app is a data panel and
@@ -1274,11 +1475,19 @@ p { margin: 0; }
   .ef-float,
   .ef-float-card,
   .ef-public .ef-card,
+  .ef-video-trigger,
+  .ef-video-trigger img,
+  .ef-video-play,
+  .ef-video-close,
   .ef-btn,
   .ef-logo {
     transition: none !important;
     transform: none !important;
   }
+  /* The play badge is centred with a transform, so it cannot simply lose it.
+     It keeps the centring and loses only the growth on hover. */
+  .ef-video-play { transform: translate(-50%, -50%) !important; }
+  .ef-video-dialog-panel { animation: none !important; }
   .ef-topnav-links a::after,
   .ef-page-footer a::after {
     transition: none !important;

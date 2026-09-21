@@ -237,12 +237,75 @@
     }, { passive: true });
   }
 
+  /* ------------------------------------------------------------------
+     The explainer video
+
+     Both "See How it Works" in the hero and the poster in the How it Works
+     section open one <dialog> holding one <video>.
+
+     Three things here are not decoration:
+
+       Closing must stop playback. A <dialog> that is closed is only hidden,
+       so without this the narration carries on from an invisible element and
+       the visitor cannot find what is talking to them. It rewinds too, so the
+       next open starts at the beginning rather than halfway through.
+
+       The hero trigger is an <a href="#how">, so its default has to be
+       prevented, and only when the dialog is genuinely usable. If <dialog> is
+       missing we leave the click alone and the browser scrolls to the section,
+       which is a worse experience but not a broken one.
+
+       play() returns a promise that rejects if the browser declines, which it
+       may do on a policy this code cannot see. It is caught and ignored: the
+       controls are right there, and an unhandled rejection in the console is
+       the kind of thing that gets noticed during a defense.
+     ------------------------------------------------------------------ */
+  function initVideoDialog() {
+    var dialog = document.querySelector('[data-video-dialog]');
+    if (!dialog || typeof dialog.showModal !== 'function') return;
+
+    var video = dialog.querySelector('[data-video]');
+
+    function open(event) {
+      if (event) event.preventDefault();
+      dialog.showModal();
+      document.documentElement.classList.add('ef-no-scroll');
+      if (video && video.play) {
+        var p = video.play();
+        if (p && p.catch) p.catch(function () {});
+      }
+    }
+
+    function close() {
+      if (dialog.open) dialog.close();
+    }
+
+    $(document).on('click', '[data-video-open]', open);
+    $(dialog).on('click', '[data-video-close]', close);
+
+    /* The dialog element itself is the full-screen backdrop, so a click that
+       lands on it rather than on the panel inside is a click outside. */
+    dialog.addEventListener('click', function (event) {
+      if (event.target === dialog) close();
+    });
+
+    /* Fires for the close button, for Escape, and for form method="dialog".
+       Hanging the reset here means every route out is covered by one handler. */
+    dialog.addEventListener('close', function () {
+      document.documentElement.classList.remove('ef-no-scroll');
+      if (!video) return;
+      video.pause();
+      try { video.currentTime = 0; } catch (e) {}
+    });
+  }
+
   $(function () {
     initDrawer();
     renderMasteryRows();
     renderBars();
     initQuizOptions();
     initLanding();
+    initVideoDialog();
     $(window).on('resize', renderBars);
   });
 

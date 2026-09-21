@@ -59,7 +59,11 @@ security_headers();
 
     <div class="ef-hero-ctas">
       <a href="register.php" class="ef-btn ef-btn-primary ef-btn-lg">Get Started for Free</a>
-      <a href="#how" class="ef-btn ef-btn-ghost ef-btn-lg">
+      <?php /* Keeps href="#how" on purpose. With JavaScript this opens the
+               dialog; without it, it still scrolls to the section, where the
+               poster and its play badge are. A button that does nothing when a
+               script fails to load is worse than a link that does less. */ ?>
+      <a href="#how" class="ef-btn ef-btn-ghost ef-btn-lg" data-video-open>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
           <path d="M6.5 5.5v5l4-2.5-4-2.5z" fill="currentColor"/>
@@ -184,9 +188,51 @@ security_headers();
   <div class="ef-page-head" style="margin-bottom:28px;">
     <div>
       <h2>How EduFlex works</h2>
-      <p>Four steps, driven by material you already have.</p>
+      <p>Watch the explainer, or read the four steps beneath it.</p>
     </div>
   </div>
+
+  <?php /* The explainer video. Served from assets/video/, never embedded from
+           YouTube or Vimeo: CLAUDE.md rule 3 and the `default-src 'self'` CSP
+           both forbid a third-party frame, and the point of vendoring
+           everything is that this page behaves the same in a defense room with
+           no wifi. There is no media-src directive, so media falls back to
+           default-src and a same-origin file is allowed.
+
+           There is deliberately no <track> element. The .srt that arrived with
+           the video is from the previous cut: it opens on the title card where
+           v2 opens on "The Challenge", and it runs to 3:37 against the file's
+           3:18. Captions that drift from the audio are worse than none, because
+           a viewer relying on them cannot tell they are being misled. The video
+           carries burned-in captions of its own, so nothing is lost by leaving
+           the track out until a matching .vtt exists.
+
+           The poster is frame 0.6s of this same file, so the player shows the
+           opening title instead of a black rectangle before anyone presses
+           play.
+
+           What sits here is a poster and a play badge, not a player. The real
+           <video> lives once, in the dialog at the foot of this page, and both
+           this and "See How it Works" in the hero open it. One element rather
+           than two means the 16 MB can never be fetched twice, and preload is
+           "none", so nothing at all is fetched until somebody asks to watch. */ ?>
+  <figure class="ef-video-figure">
+    <button type="button" class="ef-video-trigger" data-video-open
+            aria-label="Play the EduFlex explainer, 3 minutes 18 seconds">
+      <img src="assets/video/eduflex-explainer-poster.jpg" alt=""
+           width="1920" height="1080" loading="lazy" decoding="async">
+      <span class="ef-video-play" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+          <path d="M8 5.5v13l11-6.5-11-6.5z" fill="currentColor"/>
+        </svg>
+      </span>
+      <span class="ef-video-duration" aria-hidden="true">3:18</span>
+    </button>
+    <figcaption class="ef-video-caption">
+      EduFlex explainer, 3 minutes 18 seconds. Captions are shown in the video
+      itself.
+    </figcaption>
+  </figure>
 
   <div class="row g-3">
     <div class="col-12 col-md-6 col-lg-3">
@@ -424,6 +470,45 @@ recency_weight = 1 / (1 + 0.15k)     k = how many answers ago</pre>
 </section>
 
 <?php include __DIR__ . '/partials/public_footer.php'; ?>
+
+<?php /* The one and only <video> on this page. A native <dialog> rather than a
+         Bootstrap modal: the Bootstrap CSS is already loaded here but the JS
+         bundle is not, and pulling in 80 KB of it to open one panel is a poor
+         trade. <dialog> also gets the parts that are easy to do badly by hand,
+         namely the focus trap, Escape to close, and returning focus to whatever
+         opened it.
+
+         preload="none" is the important attribute. The file is 16 MB and most
+         visitors will never press play, so nothing is requested until they do.
+
+         initVideoDialog() in eduflex.js pauses and rewinds on close. Without
+         that, closing the dialog leaves the narration playing from somewhere
+         off-screen, which is the classic lightbox bug. */ ?>
+<dialog class="ef-video-dialog" data-video-dialog
+        aria-label="EduFlex explainer video">
+  <div class="ef-video-dialog-panel">
+    <button type="button" class="ef-video-close" data-video-close
+            aria-label="Close the video">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <video class="ef-video" data-video
+           controls
+           preload="none"
+           playsinline
+           poster="assets/video/eduflex-explainer-poster.jpg"
+           width="1920" height="1080">
+      <source src="assets/video/eduflex-explainer.mp4" type="video/mp4">
+      <p class="ef-second">
+        Your browser cannot play this video.
+        <a href="assets/video/eduflex-explainer.mp4">Download it instead</a>
+        (MP4, about 16 MB).
+      </p>
+    </video>
+  </div>
+</dialog>
 
 <script src="assets/vendor/jquery-3.7.1.min.js"></script>
 <script src="assets/js/eduflex.js"></script>

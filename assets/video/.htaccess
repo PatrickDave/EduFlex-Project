@@ -1,0 +1,26 @@
+# The explainer video, and the caption type it will need.
+#
+# XAMPP's conf/mime.types knows .mp4 (video/mp4) but does NOT list .vtt. Apache
+# therefore serves a caption file as application/octet-stream, and a browser
+# refuses to load a <track> that does not arrive as text/vtt. The captions then
+# fail in total silence: the CC control simply never appears, and nothing shows
+# in the console on some engines. Declaring the type here fixes it without
+# editing anyone's Apache install, so a teammate's clone and the defense-day
+# machine behave the same as this one.
+#
+# There is no .vtt in this directory yet. The one that arrived with the video is
+# from the previous cut and was removed rather than shipped out of sync; see the
+# comment in index.php. This line stays so that dropping a corrected file in is
+# the only step needed, because a missing MIME type is the failure nobody thinks
+# to look for.
+#
+# Scoped to this directory on purpose. There is no root .htaccess in EduFlex and
+# this is not a reason to add one.
+AddType text/vtt .vtt
+
+# Byte-range requests are what let a viewer drag the progress bar without
+# downloading all 16 MB first. Apache enables this by default; stated here so
+# nobody disables it upstream and wonders why seeking broke.
+<IfModule mod_headers.c>
+  Header set Accept-Ranges bytes
+</IfModule>

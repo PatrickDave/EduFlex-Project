@@ -154,6 +154,239 @@ check('and the Practice page offers one',
     str_contains((string) file_get_contents(__DIR__ . '/../app/practice.php'),
         'actions/exam_start.php'));
 
+/* --------------------------------------------------------- the explainer */
+
+/* The video is the one asset on this page a visitor notices is broken before
+   anything else, and most of the ways it breaks are silent: a file that is not
+   there, a dead caption reference, a switch to a YouTube embed that would
+   breach CLAUDE.md rule 3, or a lightbox that keeps playing audio after it is
+   closed.
+
+   Structural checks run against the markup with comments stripped. index.php
+   explains this design in a PHP comment that mentions <video> and <track> in
+   prose, and a naive substring count would read those as elements. */
+
+$markup = (function () use ($index) {
+    $out = '';
+    foreach (token_get_all($index) as $token) {
+        if (is_array($token)) {
+            if ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) { continue; }
+            $out .= $token[0] === T_INLINE_HTML
+                ? (string) preg_replace('#<!--.*?-->#s', '', $token[1])
+                : $token[1];
+            continue;
+        }
+        $out .= $token;
+    }
+    return $out;
+})();
+
+$how = (string) (strstr($markup, 'id="how"') ?: '');
+$how = (string) (substr($how, 0, (int) strpos($how, '</section>')) ?: '');
+
+section('The explainer opens in a dialog');
+
+check('the How it Works section offers a poster to click',
+    str_contains($how, 'class="ef-video-trigger"')
+    && str_contains($how, 'data-video-open'));
+
+check('that poster is a real button, not a div with a handler',
+    (bool) preg_match('/<button[^>]*class="ef-video-trigger"/', $how));
+
+check('it names what it does for a screen reader',
+    (bool) preg_match('/<button[^>]*aria-label="Play the EduFlex explainer[^"]*"/', $how));
+
+check('the section itself holds no video element any more',
+    !str_contains($how, '<video'));
+
+check('there is exactly one video element on the whole page',
+    substr_count($markup, '<video') === 1);
+
+check('and it lives inside the dialog', (function () use ($markup) {
+    $start = strpos($markup, '<dialog');
+    $end   = strpos($markup, '</dialog>');
+    $video = strpos($markup, '<video');
+    return $start !== false && $end !== false && $video !== false
+        && $video > $start && $video < $end;
+})());
+
+check('the dialog is addressable by the script',
+    str_contains($markup, 'data-video-dialog'));
+
+check('it has a close control',
+    str_contains($markup, 'data-video-close'));
+
+check('the hero button opens it, and still scrolls without JavaScript', (function () use ($markup) {
+    // A button that does nothing when a script fails to load is worse than a
+    // link that does less, so the href is the fallback and must survive.
+    return (bool) preg_match('/<a href="#how"[^>]*data-video-open/', $markup);
+})());
+
+section('The video itself');
+
+check('it is served from this origin, not embedded from elsewhere',
+    str_contains($markup, 'src="assets/video/eduflex-explainer.mp4"'));
+
+check('the file it points at is really there',
+    is_file(__DIR__ . '/../assets/video/eduflex-explainer.mp4'));
+
+check('no third-party player was introduced anywhere on the page', (function () use ($index) {
+    // Rule 3, and the CSP would block it. An <iframe> to youtube-nocookie.com
+    // is the tempting shortcut this guards against.
+    foreach (['<iframe', 'youtube.com', 'youtu.be', 'youtube-nocookie', 'vimeo.com', 'player.vimeo'] as $needle) {
+        if (stripos($index, $needle) !== false) { return false; }
+    }
+    return true;
+})());
+
+check('nothing is downloaded until somebody asks to watch',
+    str_contains($markup, 'preload="none"'));
+
+check('it carries controls, so a visitor can pause it',
+    (bool) preg_match('/<video[^>]*\bcontrols\b/s', $markup));
+
+check('it does not autoplay from the markup',
+    !str_contains($markup, 'autoplay'));
+
+check('it plays inline rather than hijacking the screen on a phone',
+    (bool) preg_match('/<video[^>]*\bplaysinline\b/s', $markup));
+
+check('there is a fallback for a browser that cannot play it',
+    str_contains($markup, 'Download it instead'));
+
+section('The poster');
+
+check('a poster is declared on the video',
+    str_contains($markup, 'poster="assets/video/eduflex-explainer-poster.jpg"'));
+
+check('and the trigger shows the same image',
+    str_contains($how, 'src="assets/video/eduflex-explainer-poster.jpg"'));
+
+check('the poster file is really there',
+    is_file(__DIR__ . '/../assets/video/eduflex-explainer-poster.jpg'));
+
+check('it is a real JPEG and the same 16/9 shape as the video', (function () {
+    $p = __DIR__ . '/../assets/video/eduflex-explainer-poster.jpg';
+    $size = @getimagesize($p);
+    // Rule 14 applies to UPLOADS, where the file is hostile. This one is built
+    // by the project and committed, so the check here is only that it is the
+    // right shape, not that it is safe.
+    return is_array($size)
+        && $size[2] === IMAGETYPE_JPEG
+        && abs(($size[0] / $size[1]) - (16 / 9)) < 0.01;
+})());
+
+check('the decorative poster image is not announced twice', (function () use ($how) {
+    // The button already carries the label. An alt on the image inside it would
+    // be read out on top of that.
+    return (bool) preg_match('/<img[^>]*alt=""/', $how);
+})());
+
+section('Closing the dialog stops the audio');
+
+$js = (string) file_get_contents(__DIR__ . '/../assets/js/eduflex.js');
+
+check('the behaviour is wired up at load',
+    str_contains($js, 'function initVideoDialog()')
+    && str_contains($js, 'initVideoDialog();'));
+
+check('closing pauses the video', (function () use ($js) {
+    // A closed <dialog> is only hidden. Without this the narration carries on
+    // from an element nobody can see, which is the classic lightbox bug.
+    $on = (string) (strstr($js, "dialog.addEventListener('close'") ?: '');
+    return str_contains(substr($on, 0, 400), 'video.pause()');
+})());
+
+check('and rewinds it, so the next open starts at the beginning', (function () use ($js) {
+    $on = (string) (strstr($js, "dialog.addEventListener('close'") ?: '');
+    return str_contains(substr($on, 0, 400), 'currentTime = 0');
+})());
+
+check('the hero anchor does not also jump the page',
+    str_contains($js, 'event.preventDefault()'));
+
+check('the scroll lock is added and removed in equal measure', (function () use ($js) {
+    // Added on open, removed on close. One without the other leaves the page
+    // permanently unscrollable, which is a worse bug than the one it fixes.
+    return substr_count($js, "classList.add('ef-no-scroll')") === 1
+        && substr_count($js, "classList.remove('ef-no-scroll')") === 1;
+})());
+
+check('a browser without <dialog> is left alone rather than broken',
+    str_contains($js, "typeof dialog.showModal !== 'function'"));
+
+section('The captions');
+
+/* 21 September 2026. The .srt supplied with the video is from the previous cut:
+   it opens on the title card where v2 opens on "The Challenge", and its last
+   cue ends at 3:37 against the file's 3:18. It was converted to .vtt and wired
+   in before those frames were actually looked at, and then taken out again.
+
+   Captions that drift from the audio are worse than no captions, because a
+   viewer relying on them has no way to tell. So the rule is not "there must be
+   a track", it is "if there is a track, the file behind it must exist". That
+   way adding a corrected .vtt later is a one-line change that this suite will
+   check rather than a change that quietly ships a dead reference. */
+
+check('no caption track points at a file that is not there', (function () use ($markup) {
+    if (!preg_match_all('/<track\b[^>]*\bsrc="([^"]+)"/i', $markup, $m)) {
+        return true;                      // no track at all: nothing to break
+    }
+    foreach ($m[1] as $src) {
+        if (!is_file(__DIR__ . '/../' . $src)) { return false; }
+    }
+    return true;
+})());
+
+check('the stale v1 caption file is not being served',
+    !is_file(__DIR__ . '/../assets/video/eduflex-explainer.vtt'));
+
+check('Apache is still told that .vtt is text/vtt, for when a matching one lands',
+    (function () {
+        // XAMPP's mime.types does not list vtt, so without this a track would be
+        // served as application/octet-stream and the browser would refuse it.
+        $ht = (string) @file_get_contents(__DIR__ . '/../assets/video/.htaccess');
+        return str_contains($ht, 'AddType text/vtt .vtt');
+    })());
+
+section('The player is styled');
+
+$css = (string) file_get_contents(__DIR__ . '/../assets/css/eduflex.css');
+
+check('every class the markup uses is defined', (function () use ($css) {
+    foreach ([
+        '.ef-video-figure', '.ef-video-trigger', '.ef-video-play',
+        '.ef-video-duration', '.ef-video-caption', '.ef-video-dialog',
+        '.ef-video-dialog-panel', '.ef-video-close', '.ef-no-scroll',
+    ] as $sel) {
+        if (!str_contains($css, $sel)) { return false; }
+    }
+    return true;
+})());
+
+check('the trigger and the panel both hold 16/9, the shape of the file',
+    substr_count($css, 'aspect-ratio: 16 / 9') >= 2);
+
+check('the dialog only lays itself out when it is open', (function () use ($css) {
+    // Setting display on .ef-video-dialog unconditionally overrides the UA rule
+    // dialog:not([open]) { display: none } and leaves the video on the page.
+    return str_contains($css, '.ef-video-dialog[open]')
+        && !preg_match('/\.ef-video-dialog\s*\{[^}]*\bdisplay:\s*flex/s', $css);
+})());
+
+check('a visitor who asked for reduced motion gets no movement from it', (function () use ($css) {
+    $block = (string) (strstr($css, '@media (prefers-reduced-motion: reduce)') ?: '');
+    return str_contains($block, '.ef-video-trigger')
+        && str_contains($block, '.ef-video-dialog-panel');
+})());
+
+check('the play badge keeps its centring when transforms are switched off', (function () use ($css) {
+    // .ef-video-play is centred WITH a transform, so a blanket
+    // "transform: none !important" would throw it into the corner.
+    $block = (string) (strstr($css, '@media (prefers-reduced-motion: reduce)') ?: '');
+    return str_contains($block, '.ef-video-play { transform: translate(-50%, -50%) !important; }');
+})());
+
 /* ----------------------------------------------------------- references */
 
 section('References');

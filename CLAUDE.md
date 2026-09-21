@@ -38,10 +38,20 @@ Browser tests need Apache and MySQL running plus `pip install playwright`:
 ```
 python3 tests/runner_browser_test.py    # practice end to end
 python3 tests/chat_browser_test.py      # the companion end to end
+python3 tests/video_browser_test.py     # the explainer dialog
 ```
 
-Both drop and recreate the `eduflex` database. Never point them at data worth
-keeping.
+**The first two drop and recreate the `eduflex` database. Never point them at
+data worth keeping.** `video_browser_test.py` is the exception: it only reads
+the public landing page, needs no database and no MySQL, and is safe to run
+against Patrick's working install.
+
+`playwright install chromium` times out on this connection. Point the suites at
+the Chrome that is already installed instead:
+
+```
+EDUFLEX_CHROMIUM="C:/Program Files/Google/Chrome/Application/chrome.exe"
+```
 
 ## Rules that are easy to break
 
@@ -222,7 +232,7 @@ partials/         sidebar.php and topbar.php for the app, public_footer.php
                   for index/login/register/privacy/terms
 database/         01_schema.sql (fresh install, destructive),
                   02_migrations.sql (existing database, safe), SCHEMA-NOTES.md
-tests/            sixteen PHP suites, two Playwright suites
+tests/            sixteen PHP suites, three Playwright suites
 tools/            rubric_run.php (the only script that spends quota),
                   migrate.php (schema changes without losing data)
 build_pages.py    regenerates app/*.php from one shell template
@@ -236,13 +246,13 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-990 PHP checks across sixteen suites, all passing, plus 83 browser checks:
+1026 PHP checks across sixteen suites, all passing, plus 111 browser checks:
 
 ```
 auth 40 | extract 44 | ai 63 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 39 | settings 60 | security 79 | avatar 87
-rubric 69 | legal 76 | manuscript 39 | subscription 48 | exams 46
-runner_browser 54 | chat_browser 29
+rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
+runner_browser 54 | chat_browser 29 | video_browser 28
 ```
 
 5 of the 32 extraction checks need the PHP zip extension, because building a
@@ -310,6 +320,59 @@ Three design points worth keeping:
 - **Exam answers count toward mastery identically**, for every topic touched.
   `attempt_finish()` recalculates each of them through
   `attempt_topics_touched()`, rather than the single topic a practice set has.
+
+## The explainer video
+
+Added to the How it Works section of the landing page on 21 September 2026.
+`assets/video/eduflex-explainer.mp4`, 1920x1080, 3:18, about 16 MB, committed
+to the repository because rule 3 means the page has to work in a room with no
+wifi and a video fetched from YouTube would not. `assets/video/.htaccess`
+declares `text/vtt`, which XAMPP's `mime.types` does not.
+
+**The `.srt` that came with the video does not match it.** It is from the
+previous cut: it opens on the title card where v2 opens on "The Challenge", and
+its last cue ends at 3:37 against the file's 3:18. It was converted, wired in,
+and removed again once the frames were actually looked at. Do not convert
+`Claude outputs/EduFlex-Explainer.srt` and add it back. The video carries
+burned-in captions, so nothing is missing; a `<track>` goes in only when a
+caption file matching v2 exists. `tests/manuscript_test.php` asserts that any
+`<track>` on the page points at a file that is really there, so adding one is
+checked rather than silently dead.
+
+The poster is frame 0.6s of the video itself, extracted with headless Chrome
+because there is no ffmpeg on this machine. Without it the player is a black
+rectangle until someone presses play.
+
+**It opens in a dialog, and there is only ever one `<video>` on the page.** Both
+"See How it Works" in the hero and the poster in the How it Works section open
+the same native `<dialog>` at the foot of `index.php`. A native dialog rather
+than a Bootstrap modal because the Bootstrap CSS is already loaded on that page
+but the JS bundle is not, and 80 KB to open one panel is a poor trade; `<dialog>`
+also brings the focus trap, Escape, and focus restoration for free.
+
+Three things there are load-bearing, all asserted in
+`tests/video_browser_test.py`:
+
+- **`preload="none"`.** Most visitors never press play, and 16 MB on every
+  landing page view would be indefensible. Nothing is requested until the dialog
+  opens.
+- **`initVideoDialog()` pauses AND rewinds on close.** A closed `<dialog>` is
+  only hidden, so without this the narration carries on from an element nobody
+  can see or find. Every route out, including Escape, goes through the one
+  `close` handler.
+- **The hero trigger stays an `<a href="#how">`.** The handler prevents the
+  jump, but with no JavaScript the link still scrolls to the poster. A button
+  that does nothing when a script fails to load is worse than a link that does
+  less.
+
+`.ef-video-play` is centred with a `transform`, so the blanket
+`transform: none !important` in the reduced-motion block has to be overridden
+for it or the badge lands in the corner. Both suites check this.
+
+Known and NOT caused by the video: `index.php` scrolls sideways by about 123px
+at 390px wide. The Methodology card holds a `<pre class="ef-formula">` that
+cannot wrap and an `.ef-table` of Bloom weights, and together they force a 493px
+floor. It predates the video and is still unfixed.
 
 ## Still to do
 

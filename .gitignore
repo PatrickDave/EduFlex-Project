@@ -12,6 +12,12 @@ storage/uploads/*
 docs/*.docx
 docs/*.pdf
 
+# Where Patrick drops source assets before they are processed into the site.
+# It currently holds a 16 MB copy of the explainer video; the copy the page
+# actually serves is assets/video/eduflex-explainer.mp4, which IS committed.
+# Without this line a `git add -A` puts both in the repository and doubles it.
+Claude outputs/
+
 # Composer's vendor directory, AT THE PROJECT ROOT ONLY.
 #
 # The leading slash matters. Written as "vendor/" this pattern also matches
