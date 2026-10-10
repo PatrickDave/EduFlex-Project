@@ -1,10 +1,12 @@
 # The API key lives in this file. Never commit it.
 # config/ai.example.php IS committed: it is the template to copy.
 config/ai.php
+config/mail.php
 
 # Uploaded learner material and extracted text.
 storage/uploads/*
 !storage/uploads/.gitkeep
+storage/backups/
 
 # The manuscript. Large, not source code, and Chapter IV may carry participant
 # data. The landing page content taken from it lives in includes/manuscript.php,

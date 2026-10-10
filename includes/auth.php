@@ -15,6 +15,7 @@ require_once __DIR__ . '/notifications.php';
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/avatar.php';
 require_once __DIR__ . '/subscription.php';
+require_once __DIR__ . '/verification.php';
 
 /* -------------------------------------------------------------------------
    Session lifetime
@@ -107,7 +108,7 @@ function auth_boot(): void
  *
  * @return array{ok:bool, errors:array<string,string>, user_id:?int}
  */
-function auth_register(string $fullName, string $email, string $password, bool $agreed): array
+function auth_register(string $fullName, string $email, string $password, bool $agreed, string $confirmPassword = ''): array
 {
     $errors = [];
 
@@ -131,6 +132,11 @@ function auth_register(string $fullName, string $email, string $password, bool $
     $passwordError = auth_password_error($password);
     if ($passwordError !== null) {
         $errors['password'] = $passwordError;
+    }
+    if ($confirmPassword === '') {
+        $errors['confirm_password'] = 'Confirm your password.';
+    } elseif ($password !== $confirmPassword) {
+        $errors['confirm_password'] = 'The two passwords do not match.';
     }
 
     if (!$agreed) {
@@ -158,6 +164,7 @@ function auth_register(string $fullName, string $email, string $password, bool $
     // PASSWORD_DEFAULT is bcrypt today and upgrades automatically in future
     // PHP versions. Never store, log or email the plain password.
     $hash = password_hash($password, PASSWORD_DEFAULT);
+    $registrationToken = null;
 
     try {
         $pdo->beginTransaction();
@@ -176,6 +183,9 @@ function auth_register(string $fullName, string $email, string $password, bool $
         ]);
 
         $userId = (int) $pdo->lastInsertId();
+        if (email_verification_enabled()) {
+            $registrationToken = trusted_browser_store(verification_user($userId), true);
+        }
 
         $pdo->commit();
     } catch (PDOException $e) {
@@ -209,6 +219,9 @@ function auth_register(string $fullName, string $email, string $password, bool $
         . 'it covers, and build your first practice set from it.'
     );
 
+    if ($registrationToken !== null) {
+        trusted_browser_cookie($registrationToken, time() + TRUSTED_BROWSER_SECONDS);
+    }
     return ['ok' => true, 'errors' => [], 'user_id' => $userId];
 }
 
@@ -280,9 +293,29 @@ function auth_login(string $email, string $password): array
         $newHash = password_hash($password, PASSWORD_DEFAULT);
         $upd = db()->prepare('UPDATE user SET password_hash = ? WHERE user_id = ?');
         $upd->execute([$newHash, $user['user_id']]);
+        $user['password_hash'] = $newHash;
     }
 
+    if (email_verification_enabled()) {
+        $verificationUser = verification_user((int) $user['user_id']);
+        if (!$verificationUser || !trusted_browser_matches($verificationUser)) {
+            $delivery = verification_begin((int) $user['user_id'], 'login');
+            return ['ok' => false, 'errors' => [], 'verification_required' => true,
+                'mail_sent' => $delivery['ok'], 'verification_error' => $delivery['error'] ?? null];
+        }
+        trusted_browser_activate_registration($verificationUser);
+    }
+    auth_complete_login($user);
+    return ['ok' => true, 'errors' => []];
+}
+
+/** Called only after password verification and any required email challenge. */
+function auth_complete_login(array $user): void
+{
+    $email = (string) $user['email'];
+    $ip = security_client_ip();
     auth_boot();
+    unset($_SESSION['_email_pending']);
     // New session ID on privilege change, to defeat session fixation.
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_regenerate_id(true);
@@ -293,14 +326,15 @@ function auth_login(string $email, string $password): array
     $_SESSION['email']     = $user['email'];
     $_SESSION['logged_in_at'] = time();
     $_SESSION['last_seen_at'] = time();
+    $_SESSION['_credential_hash'] = verification_credential($user);
+    $_SESSION['_email_grace_until'] = email_verification_enabled()
+        ? trusted_browser_expiry($user) : 0;
 
     /* A learner who mistyped four times and then got it right is not punished.
        Pruning here rather than on a schedule keeps the table small without a
        cron job, which this project does not have. */
     login_throttle_clear($email, $ip);
     login_throttle_prune();
-
-    return ['ok' => true, 'errors' => []];
 }
 
 function auth_logout(): void
@@ -337,6 +371,21 @@ function auth_is_logged_in(): bool
         auth_logout();
         flash_set('error', 'You were signed out because the session expired. Please sign in again.');
         return false;
+    }
+
+    if (email_verification_enabled()) {
+        $user = verification_user((int) $_SESSION['user_id']);
+        if (!$user || $user['account_status'] !== 'active'
+            || !hash_equals(verification_credential($user), (string) ($_SESSION['_credential_hash'] ?? ''))) {
+            auth_logout();
+            flash_set('error', 'Please sign in again to verify your current account details.');
+            return false;
+        }
+        if ($user['email_verified_at'] === null && (int) ($_SESSION['_email_grace_until'] ?? 0) <= time()) {
+            auth_logout();
+            flash_set('error', 'Your seven-day browser trust expired. Sign in and verify your email to continue.');
+            return false;
+        }
     }
 
     $_SESSION['last_seen_at'] = time();
@@ -537,11 +586,21 @@ function auth_change_password(int $userId, string $current, string $new, string 
     }
 
     try {
+        db()->beginTransaction();
         $stmt = db()->prepare('UPDATE user SET password_hash = ? WHERE user_id = ?');
-        $stmt->execute([password_hash($new, PASSWORD_DEFAULT), $userId]);
+        $newHash = password_hash($new, PASSWORD_DEFAULT);
+        $stmt->execute([$newHash, $userId]);
+        verification_revoke($userId);
+        db()->commit();
     } catch (PDOException $e) {
+        if (db()->inTransaction()) { db()->rollBack(); }
         error_log('EduFlex password change failed: ' . $e->getMessage());
         return ['ok' => false, 'errors' => ['form' => 'The password could not be changed. Try again.']];
+    }
+
+    if (email_verification_enabled() && (int) ($_SESSION['user_id'] ?? 0) === $userId) {
+        $updatedUser = verification_user($userId);
+        $_SESSION['_credential_hash'] = verification_credential($updatedUser);
     }
 
     // A new session ID on a credential change, for the same reason auth_login()

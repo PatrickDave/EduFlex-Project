@@ -27,7 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fullName,
             $email,
             (string) ($_POST['password'] ?? ''),
-            isset($_POST['agree'])
+            isset($_POST['agree']),
+            (string) ($_POST['confirm_password'] ?? '')
         );
 
         if ($result['ok']) {
@@ -100,6 +101,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p class="ef-note">At least 8 characters.</p>
           <?php endif; ?>
         </div>
+
+        <div class="ef-field">
+          <label class="ef-label" for="confirm_password">Confirm Password</label>
+          <input class="ef-input<?= isset($errors['confirm_password']) ? ' is-invalid' : '' ?>"
+                 type="password" id="confirm_password" name="confirm_password"
+                 autocomplete="new-password" minlength="8" required>
+          <?php if (isset($errors['confirm_password'])): ?>
+            <p class="ef-error"><?= e($errors['confirm_password']) ?></p>
+          <?php endif; ?>
+        </div>
+
+        <?php if (email_verification_enabled()): ?>
+          <p class="ef-note">This browser gets seven days of trust after your first sign-in.
+            You can verify your email in Profile Settings. After seven days, or on another
+            browser, an emailed code is required to sign in. Use your own device.</p>
+        <?php endif; ?>
 
         <label class="ef-check" style="margin-bottom:8px;">
           <input type="checkbox" name="agree" value="1" required>

@@ -5,6 +5,10 @@ with real registration, login and session handling on top.
 
 **Start with `SETUP.md`.** It walks through XAMPP and the database in order.
 
+Email verification and optional seven-day browser trust are available. See
+[`docs/email-verification.md`](docs/email-verification.md) for Gmail SMTP setup.
+The feature remains disabled until the sender credentials are configured.
+
 No build step, no npm, no internet needed. Bootstrap and jQuery are vendored
 in `assets/vendor/`.
 

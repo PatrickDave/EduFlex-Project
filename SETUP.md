@@ -34,7 +34,7 @@ change `Listen 80` to `Listen 8080`, and use `http://localhost:8080/` below.
 4. Scroll to the bottom and click **Go**
 
 You should see a green success message and an `eduflex` database in the left
-sidebar with 13 tables.
+sidebar with 17 tables.
 
 The script starts with `DROP DATABASE IF EXISTS eduflex`, so re-importing wipes
 and rebuilds it. That is handy while developing, and dangerous later. Remove
@@ -50,6 +50,10 @@ Open `config/database.php`. The defaults match a stock XAMPP install:
 If you set a MySQL root password during installation, put it in `DB_PASS`.
 
 ## 6. Try it
+
+Optional email verification for registration and untrusted-browser sign-in is
+documented in [docs/email-verification.md](docs/email-verification.md). Configure
+SMTP before enabling it; the default setup below uses password-only login.
 
 Go to `http://localhost/eduflex/`
 

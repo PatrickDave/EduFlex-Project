@@ -27,6 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors['form'] = 'Your session expired. Please try again.';
     } else {
         $result = auth_login($email, (string) ($_POST['password'] ?? ''));
+        if (!empty($result['verification_required'])) {
+            $_SESSION['_email_pending']['next'] = auth_safe_redirect_target($_POST['next'] ?? null);
+            flash_set('verification_error', $result['verification_error'] ?? null);
+            redirect('verify_email.php');
+        }
         if ($result['ok']) {
             /* Only follow a "next" value that stays inside this application.
                The rule lives in auth_safe_redirect_target(); the check that used
@@ -39,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $justRegistered = flash_get('registered') !== null;
+$loginNotice = flash_get('error');
 
 /* Set by app/actions/delete_account.php. The session is already destroyed by
    the time the learner arrives here, so this cannot be a flash message. It is
@@ -75,6 +81,10 @@ $justDeleted = isset($_GET['deleted']);
         </div>
       <?php endif; ?>
 
+      <?php if ($loginNotice): ?>
+        <div class="ef-alert ef-alert-error" role="alert"><?= e((string) $loginNotice) ?></div>
+      <?php endif; ?>
+
       <?php if ($justDeleted): ?>
         <div class="ef-alert ef-alert-ok">
           Your account and everything stored with it have been deleted.
@@ -98,11 +108,8 @@ $justDeleted = isset($_GET['deleted']);
 
         <div class="ef-field">
           <?php
-          /* There is no password reset in EduFlex: it needs outbound email,
-             which the system deliberately does not have. The link used to be
-             href="#", which did nothing at all. It now points at the one thing
-             that can actually help, and Settings has Change password for anyone
-             who is already signed in. */
+          /* Email verification is available; password reset remains unimplemented.
+             Settings supports password changes for learners already signed in. */
           ?>
           <label class="ef-label" for="password">
             Password
@@ -113,12 +120,8 @@ $justDeleted = isset($_GET['deleted']);
         </div>
 
         <?php
-        /* "Remember me for 30 days" used to sit here as an unchecked box that
-           nothing read. The session cookie expires when the browser closes, so
-           the label was simply untrue. Removed rather than implemented: a real
-           remember-me needs a second long-lived credential table, and that is
-           not going in before the feature freeze. Same reasoning as the absent
-           notification toggles. */
+        /* Seven-day browser trust is offered after email verification. It skips
+           the code, while requiring the password on every new sign-in. */
         ?>
 
         <button type="submit" class="ef-btn ef-btn-primary ef-btn-block ef-btn-field">

@@ -42,11 +42,25 @@ if ($stmt->fetch()) {
 }
 
 try {
+    db()->beginTransaction();
+    $emailChanged = $email !== strtolower((string) $user['email']);
     $stmt = db()->prepare(
         'UPDATE user SET full_name = ?, email = ?, program = ?, year_level = ?
           WHERE user_id = ?'
     );
     $stmt->execute([$fullName, $email, mb_substr($program, 0, 100), $year, (int) $user['user_id']]);
+    if ($emailChanged && email_verification_enabled()) {
+        db()->prepare('UPDATE user SET email_verified_at = NULL WHERE user_id = ?')
+            ->execute([(int) $user['user_id']]);
+        verification_revoke((int) $user['user_id']);
+    }
+    db()->commit();
+
+    if ($emailChanged && email_verification_enabled()) {
+        auth_logout();
+        flash_set('error', 'Your email address changed. Sign in and verify your new email address.');
+        redirect('../../login.php');
+    }
 
     // The session carries a copy of the name for greetings; keep it in step.
     $_SESSION['full_name'] = $fullName;
@@ -54,6 +68,7 @@ try {
 
     flash_set('profile_ok', 'Your profile has been updated.');
 } catch (PDOException $e) {
+    if (db()->inTransaction()) { db()->rollBack(); }
     error_log('EduFlex profile update failed: ' . $e->getMessage());
     flash_set('profile_error', 'Your profile could not be saved. Try again.');
 }

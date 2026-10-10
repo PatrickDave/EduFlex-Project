@@ -34,6 +34,7 @@ CREATE TABLE user (
   -- ADDED: path to the learner's uploaded profile picture, relative to the
   -- project root, or NULL when they have not set one. See SCHEMA-NOTES.md 7.
   avatar_path    VARCHAR(255) NULL DEFAULT NULL,
+  email_verified_at DATETIME NULL DEFAULT NULL,
   created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
   UNIQUE KEY uq_user_email (email),
@@ -370,4 +371,34 @@ CREATE TABLE login_attempt (
   PRIMARY KEY (attempt_id),
   KEY idx_login_identity (email, ip_address, attempted_at),
   KEY idx_login_ip (ip_address, attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Email codes and browser trust: only hashes are stored, never usable secrets.
+CREATE TABLE email_verification (
+  user_id INT(11) NOT NULL,
+  challenge_id CHAR(32) NOT NULL,
+  binding_hash CHAR(64) NOT NULL,
+  code_hash VARCHAR(255) NOT NULL,
+  credential_hash CHAR(64) NOT NULL,
+  expires_at BIGINT NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  last_sent_at BIGINT NOT NULL,
+  send_window_start BIGINT NOT NULL,
+  sends_in_window INT NOT NULL DEFAULT 0,
+  blocked_until BIGINT NOT NULL DEFAULT 0,
+  consumed TINYINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id),
+  CONSTRAINT fk_verification_user FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE trusted_browser (
+  token_hash CHAR(64) NOT NULL,
+  user_id INT(11) NOT NULL,
+  credential_hash CHAR(64) NOT NULL,
+  created_at BIGINT NOT NULL,
+  expires_at BIGINT NOT NULL,
+  registration_pending TINYINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (token_hash),
+  KEY idx_trust_user_expiry (user_id, expires_at),
+  CONSTRAINT fk_trust_user FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

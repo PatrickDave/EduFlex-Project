@@ -184,3 +184,27 @@ fine as long as every item in one activity shares a level, which is how the
 generator is specified. If you later mix levels inside one activity, the
 mastery weighting will silently use the wrong weight. Add `bloom_level` to
 `activity_item` at that point.
+
+## Email verification and trusted browsers (10 October 2026)
+
+`user.email_verified_at` records confirmed email ownership. Existing accounts
+are preserved and verify on their next untrusted sign-in after SMTP is enabled.
+`email_verification` holds one current code per account, its browser-session
+binding, credential signature, expiry, guessing lockout, and email send quota.
+Codes are password-hashed. Resends replace the old code without resetting guesses.
+`trusted_browser` stores SHA-256 hashes of random 256-bit cookies, bound to the
+account's current email/password credentials and expiring exactly seven days
+after code verification. Ordinary sign-in does not extend this expiry.
+Times used for expiry and quotas are Unix seconds, independent of SQL timezone.
+Both new tables cascade on account deletion. Code and trust secrets are excluded
+from data exports. Password/email changes revoke them. Apply through
+`php tools/migrate.php --apply`, never by reimporting the fresh-install schema.
+
+`trusted_browser.registration_pending` is an additive flag for the registering
+browser's one-time grant. New registrations set it to 1 without marking the email
+verified or sending a code. The first correct-password login atomically changes
+it to 0 and starts seven days of trust. The pending grant itself expires after
+seven days if unused. Existing trust rows default to 0, preserving their original
+expiry. This separates optional profile email verification from the initial
+browser grace period; subsequent new-browser or expired-trust logins still need
+an emailed code. No existing account is granted this exception retroactively.

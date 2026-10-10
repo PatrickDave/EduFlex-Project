@@ -21,6 +21,7 @@
  */
 
 declare(strict_types=1);
+$GLOBALS['eduflex_test_mail_config'] = ['enabled' => false];
 
 require_once __DIR__ . '/../includes/auth.php';
 

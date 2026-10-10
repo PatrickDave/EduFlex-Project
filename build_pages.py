@@ -1603,6 +1603,10 @@ $exportErr   = flash_get('export_error');
 $deleteErr   = flash_get('delete_error');
 $avatarOk    = flash_get('avatar_ok');
 $avatarErr   = flash_get('avatar_error');
+$emailVerificationOk = flash_get('email_verification_ok');
+$emailVerificationErr = flash_get('email_verification_error');
+$emailSecurityEnabled = email_verification_enabled();
+$emailVerified = $emailSecurityEnabled && verification_user($uid)['email_verified_at'] !== null;
 
 $hasAvatar = avatar_has($uid);
 $plan      = subscription_for($uid);
@@ -1624,9 +1628,31 @@ $plan      = subscription_for($uid);
         <?php if ($deleteErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $deleteErr) ?></div><?php endif; ?>
         <?php if ($avatarOk): ?><div class="ef-alert ef-alert-ok"><?= e((string) $avatarOk) ?></div><?php endif; ?>
         <?php if ($avatarErr): ?><div class="ef-alert ef-alert-error"><?= e((string) $avatarErr) ?></div><?php endif; ?>
+        <?php if ($emailVerificationOk): ?><div class="ef-alert ef-alert-ok" role="status"><?= e((string) $emailVerificationOk) ?></div><?php endif; ?>
+        <?php if ($emailVerificationErr): ?><div class="ef-alert ef-alert-error" role="alert"><?= e((string) $emailVerificationErr) ?></div><?php endif; ?>
 
         <div class="ef-row">
           <div class="ef-col ef-stack">
+
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:6px;">Email verification</div>
+              <p class="ef-card-sub"><?= e((string) $user['email']) ?></p>
+              <?php if ($emailVerified): ?>
+                <div class="ef-alert ef-alert-ok">Email verified</div>
+              <?php elseif ($emailSecurityEnabled): ?>
+                <p class="ef-note">Your email is not verified yet. You can verify it now.
+                  Your first sign-in in the registering browser grants seven days of trust.
+                  After that, or on another browser, you must enter an emailed code to sign in.</p>
+                <form action="actions/verify_email.php" method="post">
+                  <?= csrf_field() ?>
+                  <button class="ef-btn ef-btn-primary" type="submit">Verify Email</button>
+                </form>
+              <?php else: ?>
+                <p class="ef-note">Email verification is currently unavailable.</p>
+              <?php endif; ?>
+              <p class="ef-note" style="margin-top:12px;">Verifying your email confirms ownership.
+                Sign-in codes are still required on new browsers and when browser trust expires.</p>
+            </section>
 
             <!-- Profile picture. Its own form, because a file upload needs
                  enctype="multipart/form-data" and the details form below does

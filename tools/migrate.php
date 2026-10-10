@@ -40,6 +40,45 @@ $apply = in_array('--apply', $argv, true);
  */
 $migrations = [
     [
+        'name' => 'user.email_verified_at (email ownership)',
+        'since' => '2026-10-10',
+        'check' => static fn(PDO $pdo): bool => migrate_column_exists($pdo, 'user', 'email_verified_at'),
+        'sql' => 'ALTER TABLE user ADD COLUMN email_verified_at DATETIME NULL DEFAULT NULL',
+    ],
+    [
+        'name' => 'email_verification table (expiring email codes)',
+        'since' => '2026-10-10',
+        'check' => static fn(PDO $pdo): bool => migrate_table_exists($pdo, 'email_verification'),
+        'sql' => 'CREATE TABLE email_verification (
+            user_id INT(11) NOT NULL PRIMARY KEY,
+            challenge_id CHAR(32) NOT NULL, binding_hash CHAR(64) NOT NULL,
+            code_hash VARCHAR(255) NOT NULL, credential_hash CHAR(64) NOT NULL,
+            expires_at BIGINT NOT NULL, attempts INT NOT NULL DEFAULT 0,
+            last_sent_at BIGINT NOT NULL, send_window_start BIGINT NOT NULL,
+            sends_in_window INT NOT NULL DEFAULT 0, blocked_until BIGINT NOT NULL DEFAULT 0,
+            consumed TINYINT NOT NULL DEFAULT 0,
+            CONSTRAINT fk_verification_user FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+    ],
+    [
+        'name' => 'trusted_browser table (seven-day browser trust)',
+        'since' => '2026-10-10',
+        'check' => static fn(PDO $pdo): bool => migrate_table_exists($pdo, 'trusted_browser'),
+        'sql' => 'CREATE TABLE trusted_browser (
+            token_hash CHAR(64) NOT NULL PRIMARY KEY, user_id INT(11) NOT NULL,
+            credential_hash CHAR(64) NOT NULL, created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL,
+            registration_pending TINYINT NOT NULL DEFAULT 0,
+            KEY idx_trust_user_expiry (user_id, expires_at),
+            CONSTRAINT fk_trust_user FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+    ],
+    [
+        'name' => 'trusted_browser.registration_pending (first login)',
+        'since' => '2026-10-10',
+        'check' => static fn(PDO $pdo): bool => migrate_column_exists($pdo, 'trusted_browser', 'registration_pending'),
+        'sql' => 'ALTER TABLE trusted_browser ADD COLUMN registration_pending TINYINT NOT NULL DEFAULT 0',
+    ],
+    [
         'name'  => 'login_attempt table (login rate limiting)',
         'since' => '2026-09-14',
         'check' => static fn(PDO $pdo): bool => migrate_table_exists($pdo, 'login_attempt'),

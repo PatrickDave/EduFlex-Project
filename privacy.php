@@ -113,9 +113,18 @@ $ai = legal_ai_disclosure();
       <li>
         Failed sign-in attempts only, recorded as the email tried and the IP address it
         came from. This is what stops somebody guessing passwords at your account.
-        Successful sign-ins are never recorded, so this is not a log of when you study,
-        and a successful sign-in deletes the failed attempts for that address.
+        Completing sign-in deletes the failed attempts for that address.
       </li>
+      <li>When email verification is enabled, EduFlex stores your verification time,
+        hashed verification codes, expiry times, and counters to limit code guessing
+        and email requests. Codes expire after 10 minutes.</li>
+      <li>Registration grants the registering browser a one-time seven-day trust
+        period that begins at its first successful password login. Email verification
+        in Profile Settings is optional during this period. Afterwards, or on a new
+        browser, an emailed code is required to sign in.</li>
+      <li>Browser trust uses a random security cookie and a matching
+        hashed database token remember it for seven days. This does not sign you in
+        automatically. Password or email changes revoke browser trust.</li>
     </ul>
   </section>
 
@@ -125,20 +134,22 @@ $ai = legal_ai_disclosure();
       Stated because these are the things people reasonably assume a website does.
     </p>
     <ul>
-      <li>No analytics, no tracking pixels and no advertising. There is no third party
-        watching you use this.</li>
+      <li>No analytics, no tracking pixels and no advertising.</li>
       <li>
-        No cookies except one session cookie, which exists so the site knows you are
-        signed in. It is deleted when you sign out or close your browser.
+        EduFlex uses a session cookie so it knows you are signed in, and an optional
+        trusted-browser cookie for the initial registration grant or seven-day
+        browser trust. Signing out ends the session;
+        browser trust remains until it expires or your credentials change.
       </li>
       <li>
         No requests to any other website. Every font, stylesheet and script is served
-        from this server, which is also why EduFlex works with no internet connection.
+        from this server. Sending verification emails and using a live AI provider
+        require an internet connection.
       </li>
-      <li>No email. EduFlex will never send you anything, which also means there is no
-        password reset by email.</li>
-      <li>Nothing is sold, shared or published. Your data is not used in any way beyond
-        running the system and the study it is part of.</li>
+      <li>When configured, EduFlex sends security verification emails. It sends no
+        marketing emails. Password reset by email is not implemented.</li>
+      <li>Your data is not sold or published. Configured email and AI providers receive
+        the data needed to deliver those features, as described below.</li>
       <li>No access to your camera, microphone or location. The browser is instructed to
         refuse them.</li>
     </ul>
@@ -146,6 +157,10 @@ $ai = legal_ai_disclosure();
 
   <section>
     <h2>4. What leaves the server</h2>
+    <p>When email verification is enabled, the configured SMTP provider receives your
+      email address and the security email containing your verification code. With
+      Gmail SMTP, Google delivers that email. Your password and uploaded study
+      documents are not included in verification emails.</p>
     <?php if ($ai['sends']): ?>
       <p>
         EduFlex uses a language model to work out the topics in your material, to write
@@ -178,7 +193,7 @@ $ai = legal_ai_disclosure();
       </p>
     <?php else: ?>
       <p>
-        <strong>Nothing currently leaves this server.</strong> EduFlex is configured with
+        <strong>No study material is sent to an AI provider.</strong> EduFlex is configured with
         its built-in mock provider, which produces sample questions and answers locally.
         No part of your material is transmitted anywhere.
       </p>

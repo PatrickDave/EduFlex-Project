@@ -13,6 +13,7 @@
  */
 
 declare(strict_types=1);
+$GLOBALS['eduflex_test_mail_config'] = ['enabled' => false];
 
 require_once __DIR__ . '/../includes/auth.php';
 
@@ -93,7 +94,7 @@ check('returns ok=false',                 $r['ok'] === false);
 
 section('Successful registration');
 
-$r = auth_register('Patrick Dave Cagas', 'Patrick@Example.COM ', 'correct-horse-8', true);
+$r = auth_register('Patrick Dave Cagas', 'Patrick@Example.COM ', 'correct-horse-8', true, 'correct-horse-8');
 check('creates the account', $r['ok'] === true);
 check('returns a user id',   is_int($r['user_id']) && $r['user_id'] > 0);
 
@@ -124,7 +125,7 @@ check('creates a welcome notification', (int) $notif['c'] === 1);
 
 section('Duplicate accounts');
 
-$r = auth_register('Someone Else', 'patrick@example.com', 'another-pass-9', true);
+$r = auth_register('Someone Else', 'patrick@example.com', 'another-pass-9', true, 'another-pass-9');
 check('rejects a duplicate email',   $r['ok'] === false && isset($r['errors']['email']));
 
 $count = $pdo->query('SELECT COUNT(*) c FROM user')->fetch();

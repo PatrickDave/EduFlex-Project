@@ -26,6 +26,36 @@
 
 USE eduflex;
 
+-- 2026-10-10 Email verification. tools/migrate.php is portable across MySQL/MariaDB.
+ALTER TABLE user ADD COLUMN IF NOT EXISTS email_verified_at DATETIME NULL DEFAULT NULL;
+CREATE TABLE IF NOT EXISTS email_verification (
+  user_id INT(11) NOT NULL PRIMARY KEY,
+  challenge_id CHAR(32) NOT NULL,
+  binding_hash CHAR(64) NOT NULL,
+  code_hash VARCHAR(255) NOT NULL,
+  credential_hash CHAR(64) NOT NULL,
+  expires_at BIGINT NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  last_sent_at BIGINT NOT NULL,
+  send_window_start BIGINT NOT NULL,
+  sends_in_window INT NOT NULL DEFAULT 0,
+  blocked_until BIGINT NOT NULL DEFAULT 0,
+  consumed TINYINT NOT NULL DEFAULT 0,
+  CONSTRAINT fk_verification_user FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS trusted_browser (
+  token_hash CHAR(64) NOT NULL PRIMARY KEY,
+  user_id INT(11) NOT NULL,
+  credential_hash CHAR(64) NOT NULL,
+  created_at BIGINT NOT NULL,
+  expires_at BIGINT NOT NULL,
+  registration_pending TINYINT NOT NULL DEFAULT 0,
+  KEY idx_trust_user_expiry (user_id, expires_at),
+  CONSTRAINT fk_trust_user FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE trusted_browser ADD COLUMN IF NOT EXISTS registration_pending TINYINT NOT NULL DEFAULT 0;
+
 
 -- ---------------------------------------------------------------------------
 -- 2026-09-14  Login rate limiting.
