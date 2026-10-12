@@ -58,7 +58,7 @@ $justDeleted = isset($_GET['deleted']);
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Log in — EduFlex</title>
 <link href="assets/vendor/bootstrap-5.3.3.min.css" rel="stylesheet">
-<link href="assets/css/eduflex.css" rel="stylesheet">
+<link href="<?= asset('assets/css/eduflex.css') ?>" rel="stylesheet">
 </head>
 <body>
 
@@ -115,8 +115,11 @@ $justDeleted = isset($_GET['deleted']);
             Password
             <a href="app/support.php">Cannot sign in?</a>
           </label>
-          <input class="ef-input" type="password" id="password" name="password"
-                 placeholder="••••••••" autocomplete="current-password" required>
+          <div class="ef-password">
+            <input class="ef-input" type="password" id="password" name="password"
+                   placeholder="••••••••" autocomplete="current-password" required>
+            <?= password_toggle_html('password') ?>
+          </div>
         </div>
 
         <?php
@@ -143,6 +146,6 @@ $justDeleted = isset($_GET['deleted']);
 </div>
 
 <script src="assets/vendor/jquery-3.7.1.min.js"></script>
-<script src="assets/js/eduflex.js"></script>
+<script src="<?= asset('assets/js/eduflex.js') ?>"></script>
 </body>
 </html>

@@ -304,6 +304,74 @@ p { margin: 0; }
 .ef-input.is-invalid { border-color: var(--ef-weak); }
 .ef-input.is-invalid:focus { box-shadow: 0 0 0 3px rgba(244, 63, 94, .16); }
 
+/* ---- Show / hide password -----------------------------------------------
+
+   A cat's eye: the almond outline with a vertical slit pupil, rather than the
+   round pupil every other site uses. Inline SVG and stroke="currentColor", the
+   same rule the nav icons follow, because rule 3 and the CSP forbid an icon
+   font or a sprite from a CDN.
+
+   Which of the two eyes shows is decided here by a class, not by JavaScript
+   setting styles. That keeps the toggle's appearance in the stylesheet where
+   the rest of the design lives, and means the button cannot end up in a state
+   with both icons visible if a script fails halfway.
+   -------------------------------------------------------------------------- */
+
+.ef-password { position: relative; }
+
+/* Room for the button, so a long password never runs underneath it. */
+.ef-password .ef-input { padding-right: 46px; }
+
+.ef-password-toggle {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--ef-r-sm);
+  background: transparent;
+  color: var(--ef-text-muted);
+  transition: color .18s ease, background .18s ease;
+}
+.ef-password-toggle:hover {
+  color: var(--ef-primary);
+  background: var(--ef-surface-subtle);
+}
+.ef-password-toggle:focus-visible {
+  outline: 2px solid var(--ef-primary-bright);
+  outline-offset: 1px;
+  color: var(--ef-primary);
+}
+/* Revealed is a state worth seeing at a glance, since it means the password is
+   currently readable on screen. */
+.ef-password-toggle.is-revealed { color: var(--ef-primary); }
+
+.ef-password-toggle .ef-eye-shut { display: none; }
+.ef-password-toggle.is-revealed .ef-eye-open { display: none; }
+.ef-password-toggle.is-revealed .ef-eye-shut { display: block; }
+
+/* The slit narrows as it opens, the way a real cat's does in low light. */
+.ef-password-toggle .ef-eye-pupil {
+  transform-origin: center;
+  transition: transform .25s cubic-bezier(.34, 1.56, .64, 1);
+}
+.ef-password-toggle:hover .ef-eye-pupil { transform: scaleX(.6); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-password-toggle,
+  .ef-password-toggle .ef-eye-pupil {
+    transition: none !important;
+  }
+  .ef-password-toggle:hover .ef-eye-pupil { transform: none; }
+}
+
 /* Field-level error message */
 .ef-error {
   font-size: 11.5px;

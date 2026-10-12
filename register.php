@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Create your account — EduFlex</title>
 <link href="assets/vendor/bootstrap-5.3.3.min.css" rel="stylesheet">
-<link href="assets/css/eduflex.css" rel="stylesheet">
+<link href="<?= asset('assets/css/eduflex.css') ?>" rel="stylesheet">
 </head>
 <body>
 
@@ -92,9 +92,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <div class="ef-field">
           <label class="ef-label" for="password">Password</label>
-          <input class="ef-input<?= isset($errors['password']) ? ' is-invalid' : '' ?>"
-                 type="password" id="password" name="password"
-                 placeholder="••••••••" autocomplete="new-password" minlength="8" required>
+          <div class="ef-password">
+            <input class="ef-input<?= isset($errors['password']) ? ' is-invalid' : '' ?>"
+                   type="password" id="password" name="password"
+                   placeholder="••••••••" autocomplete="new-password" minlength="8" required>
+            <?= password_toggle_html('password') ?>
+          </div>
           <?php if (isset($errors['password'])): ?>
             <p class="ef-error"><?= e($errors['password']) ?></p>
           <?php else: ?>
@@ -104,9 +107,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <div class="ef-field">
           <label class="ef-label" for="confirm_password">Confirm Password</label>
-          <input class="ef-input<?= isset($errors['confirm_password']) ? ' is-invalid' : '' ?>"
-                 type="password" id="confirm_password" name="confirm_password"
-                 autocomplete="new-password" minlength="8" required>
+          <div class="ef-password">
+            <input class="ef-input<?= isset($errors['confirm_password']) ? ' is-invalid' : '' ?>"
+                   type="password" id="confirm_password" name="confirm_password"
+                   autocomplete="new-password" minlength="8" required>
+            <?= password_toggle_html('confirm_password') ?>
+          </div>
           <?php if (isset($errors['confirm_password'])): ?>
             <p class="ef-error"><?= e($errors['confirm_password']) ?></p>
           <?php endif; ?>
@@ -152,6 +158,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script src="assets/vendor/jquery-3.7.1.min.js"></script>
-<script src="assets/js/eduflex.js"></script>
+<script src="<?= asset('assets/js/eduflex.js') ?>"></script>
 </body>
 </html>

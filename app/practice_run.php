@@ -37,7 +37,7 @@ $title  = 'Practice';
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?> — EduFlex</title>
 <link href="../assets/vendor/bootstrap-5.3.3.min.css" rel="stylesheet">
-<link href="../assets/css/eduflex.css" rel="stylesheet">
+<link href="<?= asset('../assets/css/eduflex.css') ?>" rel="stylesheet">
 </head>
 <body>
 
@@ -439,6 +439,6 @@ $topicName = $attempt['topic_name'] !== null
 </div>
 
 <script src="../assets/vendor/jquery-3.7.1.min.js"></script>
-<script src="../assets/js/eduflex.js"></script>
+<script src="<?= asset('../assets/js/eduflex.js') ?>"></script>
 </body>
 </html>

@@ -299,6 +299,53 @@
     });
   }
 
+  /* ------------------------------------------------------------------
+     Show / hide password
+
+     Three fields: one on login, two on registration. Delegated from the
+     document so one handler covers all of them and any added later.
+
+     Two details that are easy to get wrong:
+
+       Changing input.type moves the caret to the end in most engines, which
+       is maddening halfway through typing a long password. The selection is
+       read before the swap and restored after it.
+
+       Which icon shows is a CSS class, not a style set from here. If this
+       script never loads, the button simply sits there showing a closed eye
+       rather than showing both icons at once.
+
+     The button is type="button" in password_toggle_html(), so it cannot submit
+     the form it lives in. That is asserted in tests/auth_test.php.
+     ------------------------------------------------------------------ */
+  function initPasswordToggles() {
+    $(document).on('click', '[data-password-toggle]', function () {
+      var $button = $(this);
+      var input = $button.closest('.ef-password').find('input')[0];
+      if (!input) return;
+
+      var reveal = input.type === 'password';
+      var start = null;
+      var end = null;
+      try { start = input.selectionStart; end = input.selectionEnd; } catch (e) {}
+
+      input.type = reveal ? 'text' : 'password';
+
+      $button
+        .toggleClass('is-revealed', reveal)
+        .attr('aria-pressed', reveal ? 'true' : 'false')
+        .attr('aria-label', reveal ? 'Hide password' : 'Show password')
+        .attr('title', reveal ? 'Hide password' : 'Show password');
+
+      // Firefox throws on setSelectionRange for some input types, and a lost
+      // caret is not worth an exception.
+      input.focus();
+      if (start !== null) {
+        try { input.setSelectionRange(start, end); } catch (e) {}
+      }
+    });
+  }
+
   $(function () {
     initDrawer();
     renderMasteryRows();
@@ -306,6 +353,7 @@
     initQuizOptions();
     initLanding();
     initVideoDialog();
+    initPasswordToggles();
     $(window).on('resize', renderBars);
   });
 

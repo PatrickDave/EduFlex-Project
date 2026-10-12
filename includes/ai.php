@@ -59,6 +59,104 @@ interface AiProvider
    Shared HTTP behaviour
    ------------------------------------------------------------------------- */
 
+/**
+ * Does this 429 body mean "no credit" rather than "too fast"?
+ *
+ * ONLY the machine-readable fields are trusted. There is no prose fallback, and
+ * that is a correction, not an oversight.
+ *
+ * An earlier version of this matched the sentence "exceeded your current quota"
+ * as well. Google's free-tier RATE LIMIT reads, verbatim:
+ *
+ *   "You exceeded your current quota, please check your plan and billing
+ *    details. ... Quota exceeded for metric:
+ *    generativelanguage.googleapis.com/generate_content_free_tier_requests,
+ *    limit: 20 ... Please retry in 8h45m30s."
+ *
+ * Google tells you to check your billing for something that is purely a
+ * throttle, so the prose is actively misleading and cannot be used. On 12
+ * October 2026 that fallback told Patrick his account had no credit while the
+ * very same minute another call succeeded.
+ *
+ * When in doubt this returns false, which means the caller retries. Retrying a
+ * billing error wastes three round trips; refusing to retry a real rate limit
+ * throws away a call that would have worked. The second mistake is worse.
+ */
+function ai_body_is_out_of_credit(string $body): bool
+{
+    if ($body === '') {
+        return false;
+    }
+
+    $decoded = json_decode($body, true);
+    if (!is_array($decoded)) {
+        return false;
+    }
+
+    $error = $decoded['error'] ?? [];
+    if (!is_array($error)) {
+        return false;
+    }
+
+    // Gemini's throttle. Named explicitly so no future matcher can reclaim it.
+    if ((string) ($error['status'] ?? '') === 'RESOURCE_EXHAUSTED') {
+        return false;
+    }
+
+    foreach ([(string) ($error['type'] ?? ''), (string) ($error['code'] ?? '')] as $field) {
+        if (in_array($field, [
+            'insufficient_quota',
+            'credit_balance_exhausted',
+            'billing_hard_limit_reached',
+            'billing_not_active',
+        ], true)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * How long the provider said to wait, in seconds, or null if it did not say.
+ *
+ * Gemini returns a google.rpc.RetryInfo detail carrying the real figure, and it
+ * is worth surfacing: "retry in 8h45m" and "wait a minute" call for completely
+ * different decisions, and the daily free-tier quota produces the former.
+ */
+function ai_retry_after_seconds(string $body): ?int
+{
+    $decoded = json_decode($body, true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+
+    foreach (($decoded['error']['details'] ?? []) as $detail) {
+        $delay = is_array($detail) ? ($detail['retryDelay'] ?? null) : null;
+        if (is_string($delay) && preg_match('/^([0-9]+(?:\.[0-9]+)?)s$/', $delay, $m)) {
+            return (int) round((float) $m[1]);
+        }
+    }
+
+    return null;
+}
+
+/**
+ * "8h 45m", "90s". For telling somebody when it is worth trying again.
+ */
+function ai_format_duration(int $seconds): string
+{
+    if ($seconds < 60) {
+        return $seconds . 's';
+    }
+    if ($seconds < 3600) {
+        return (int) round($seconds / 60) . 'm';
+    }
+    $hours   = intdiv($seconds, 3600);
+    $minutes = intdiv($seconds % 3600, 60);
+    return $minutes > 0 ? $hours . 'h ' . $minutes . 'm' : $hours . 'h';
+}
+
 abstract class HttpAiProvider implements AiProvider
 {
     /**
@@ -68,6 +166,14 @@ abstract class HttpAiProvider implements AiProvider
      * is the correct response, not an error to show the learner. A 5xx is the
      * provider having a bad moment. A 4xx other than 429 is our mistake and
      * retrying would just repeat it.
+     *
+     * One 429 is NOT a rate limit. OpenAI returns 429 with type
+     * "insufficient_quota" when the account has no credit left, and that will
+     * never succeed however long you wait: retrying it is three wasted round
+     * trips and, worse, a message that sends you looking at your rate tier
+     * instead of your billing page. Patrick hit exactly this on 12 October 2026
+     * with a brand-new key that had authenticated perfectly. Only the response
+     * body distinguishes the two, so it is read before deciding to retry.
      *
      * @return array{ok:bool, status:int, body:string, error:?string, attempts:int, latencyMs:int}
      */
@@ -109,7 +215,31 @@ abstract class HttpAiProvider implements AiProvider
                 return ['ok' => false, 'status' => $status, 'body' => (string) $body,
                         'error' => 'The API key was rejected. Check AI_API_KEY in config/ai.php.',
                         'attempts' => $attempt, 'latencyMs' => $latency];
+            } elseif ($status === 429 && ai_body_is_out_of_credit((string) $body)) {
+                // Out of credit, not throttled. No amount of waiting fixes it.
+                return ['ok' => false, 'status' => $status, 'body' => (string) $body,
+                        'error' => 'The provider account has no credit left. '
+                                 . 'Add credit to your provider account; this is '
+                                 . 'a billing problem, not a rate limit, and '
+                                 . 'retrying will not help.',
+                        'attempts' => $attempt, 'latencyMs' => $latency];
             } elseif ($status === 429 || $status >= 500) {
+                if ($status === 429) {
+                    /* A daily quota is not worth three retries. When the
+                       provider says how long to wait and it is longer than the
+                       whole backoff sequence, stop and say so: the free tier's
+                       daily limit reports hours, and spending two more calls
+                       discovering that again is pure waste. */
+                    $retryAfter = ai_retry_after_seconds((string) $body);
+                    if ($retryAfter !== null && $retryAfter > 120) {
+                        return ['ok' => false, 'status' => $status, 'body' => (string) $body,
+                                'error' => 'The provider quota is used up. It said to retry in '
+                                         . ai_format_duration($retryAfter)
+                                         . '. This is a limit on how many requests are allowed, '
+                                         . 'not a billing problem.',
+                                'attempts' => $attempt, 'latencyMs' => $latency];
+                    }
+                }
                 $lastErr  = $status === 429
                     ? 'The provider rate limit was reached.'
                     : 'The provider returned an error (' . $status . ').';
@@ -261,7 +391,34 @@ final class GeminiProvider extends HttpAiProvider
             return AiResult::failure('No API key is set. Add it to config/ai.php.');
         }
 
-        $generation = ['temperature' => 0.2, 'maxOutputTokens' => $maxTokens];
+        /* thinkingBudget 0 is not a tuning preference, it is required.
+         *
+         * Current Gemini Flash models reason before they answer, and those
+         * reasoning tokens come out of maxOutputTokens. Measured on
+         * gemini-3.5-flash on 12 October 2026, asked for three short JSON
+         * objects inside a 300-token cap:
+         *
+         *   thinking on   284 thought tokens, 12 output, finishReason
+         *                 MAX_TOKENS, reply truncated to `{"ok":`
+         *   budget 0      0 thought tokens, 88 output, finishReason STOP,
+         *                 valid JSON, and faster: 1.9s against 2.5s
+         *
+         * EduFlex asks for structured output under deliberately tight caps:
+         * 900 tokens for topics and chat, 2600 for a set of 8 questions. With
+         * thinking left on, generation spends the budget reasoning and returns
+         * half a JSON document. questions_validate() then rejects the whole set
+         * as malformed, and the Chapter IV rejection rate measures the token
+         * cap rather than the model. That is a wrong number that looks like a
+         * real finding, which is the worst kind.
+         *
+         * Pro and reasoning-first models may refuse a budget of 0. If a model
+         * ever 400s on this field, raise the caps instead of removing it.
+         */
+        $generation = [
+            'temperature'    => 0.2,
+            'maxOutputTokens' => $maxTokens,
+            'thinkingConfig' => ['thinkingBudget' => 0],
+        ];
         if ($wantJson) {
             $generation['responseMimeType'] = 'application/json';
         }

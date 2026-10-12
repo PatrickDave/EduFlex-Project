@@ -23,7 +23,7 @@ security_headers();
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EduFlex — AI-Powered Personalized Learning Companion</title>
 <link href="assets/vendor/bootstrap-5.3.3.min.css" rel="stylesheet">
-<link href="assets/css/eduflex.css" rel="stylesheet">
+<link href="<?= asset('assets/css/eduflex.css') ?>" rel="stylesheet">
 </head>
 <body class="ef-public">
 
@@ -511,6 +511,6 @@ recency_weight = 1 / (1 + 0.15k)     k = how many answers ago</pre>
 </dialog>
 
 <script src="assets/vendor/jquery-3.7.1.min.js"></script>
-<script src="assets/js/eduflex.js"></script>
+<script src="<?= asset('assets/js/eduflex.js') ?>"></script>
 </body>
 </html>

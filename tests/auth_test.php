@@ -190,6 +190,172 @@ section('Output escaping');
 check('escapes angle brackets', e('<script>') === '&lt;script&gt;');
 check('escapes quotes',         e('"x"') === '&quot;x&quot;');
 
+/* ------------------------------------------------- show / hide password */
+
+section('The password reveal control');
+
+/* Added 12 October 2026. The behaviour lives in eduflex.js and is driven in a
+   real browser by tests/password_browser_test.py. What is checked here is the
+   markup contract that behaviour depends on, because these are the parts that
+   fail silently or dangerously rather than visibly. */
+
+$toggle = password_toggle_html('password');
+
+check('it is a button, not a link or a div',
+    str_starts_with($toggle, '<button '));
+
+/* The one that really matters. A <button> inside a <form> submits it by
+   default, so a missing type="button" would mean that revealing your password
+   posts the login form. It would look like a broken login, not like a missing
+   attribute, and you would hunt for it in the wrong place. */
+check('it is type="button", so it cannot submit the form it sits in',
+    str_contains($toggle, 'type="button"'));
+
+check('it starts in the hidden state',
+    str_contains($toggle, 'aria-pressed="false"')
+    && str_contains($toggle, 'aria-label="Show password"'));
+
+check('it says which field it controls',
+    str_contains($toggle, 'aria-controls="password"'));
+
+check('it ships both eyes, so CSS can swap them without JavaScript',
+    str_contains($toggle, 'ef-eye-open') && str_contains($toggle, 'ef-eye-shut'));
+
+check('the drawings are hidden from screen readers, the button carries the name',
+    substr_count($toggle, 'aria-hidden="true"') === 2);
+
+check('it is a cat eye: an almond with a vertical slit, not a round pupil',
+    // ry greater than rx is the slit. A round pupil would be rx === ry.
+    str_contains($toggle, 'rx="1.9"') && str_contains($toggle, 'ry="4.2"'));
+
+check('the icon is inline SVG, not a font or a sprite from a CDN',
+    // Rule 3 and the CSP. An <i class="fa-..."> or an external <use> would be
+    // invisible in the defense room and blocked by the policy.
+    str_contains($toggle, '<svg')
+    && !str_contains($toggle, '<use')
+    && !str_contains($toggle, 'http'));
+
+check('the field id is escaped, so it cannot break out of the attribute',
+    (function () {
+        $out = password_toggle_html('x" onfocus="alert(1)');
+        return !str_contains($out, 'onfocus="alert(1)"');
+    })());
+
+section('Both public forms use it');
+
+$loginSrc    = (string) file_get_contents(__DIR__ . '/../login.php');
+$registerSrc = (string) file_get_contents(__DIR__ . '/../register.php');
+
+check('login has one toggle',
+    substr_count($loginSrc, 'password_toggle_html(') === 1);
+check('registration has two, one per field',
+    substr_count($registerSrc, 'password_toggle_html(') === 2);
+
+check('every password field on those two pages is wrapped so the button has a home',
+    (function () use ($loginSrc, $registerSrc) {
+        // A new password input added without its .ef-password wrapper would put
+        // the button at the top-left of the page rather than inside the field.
+        foreach ([$loginSrc, $registerSrc] as $src) {
+            $fields  = substr_count($src, 'type="password"');
+            $wrapped = substr_count($src, 'class="ef-password"');
+            if ($fields !== $wrapped) { return false; }
+        }
+        return true;
+    })());
+
+check('the behaviour is wired up at load', (function () {
+    $js = (string) file_get_contents(__DIR__ . '/../assets/js/eduflex.js');
+    return str_contains($js, 'function initPasswordToggles()')
+        && str_contains($js, 'initPasswordToggles();');
+})());
+
+check('the caret is preserved across the type swap', (function () {
+    // Changing input.type sends the caret to the end in most engines, which is
+    // maddening halfway through a long password.
+    $js = (string) file_get_contents(__DIR__ . '/../assets/js/eduflex.js');
+    return str_contains($js, 'setSelectionRange');
+})());
+
+check('the stylesheet defines every class the markup uses', (function () {
+    $css = (string) file_get_contents(__DIR__ . '/../assets/css/eduflex.css');
+    foreach (['.ef-password', '.ef-password-toggle', '.ef-eye-open',
+              '.ef-eye-shut', '.ef-eye-pupil'] as $sel) {
+        if (!str_contains($css, $sel)) { return false; }
+    }
+    return true;
+})());
+
+check('the input is padded so a long password cannot run under the button',
+    (function () {
+        $css = (string) file_get_contents(__DIR__ . '/../assets/css/eduflex.css');
+        return (bool) preg_match('/\.ef-password\s+\.ef-input\s*\{[^}]*padding-right:\s*4[0-9]px/s', $css);
+    })());
+
+/* --------------------------------------------------------- cache busting */
+
+section('Our own CSS and JS carry a version');
+
+/* 12 October 2026. The password reveal shipped working, tested and verified in
+   a browser, and on Patrick's screen the icon sat in the wrong place and did
+   nothing when clicked. The code was fine. The markup comes from PHP so it
+   appeared at once, but eduflex.css and eduflex.js came from his cache: the old
+   stylesheet had no rule to position the button and the old script had no
+   handler to run.
+
+   Apache sends no Cache-Control for these files, so a browser may reuse them
+   without asking, and does. This is the worst kind of bug to report, because it
+   looks broken to the person seeing it and fine to the person who wrote it. */
+
+check('asset() appends a version token', (function () {
+    return (bool) preg_match('/^assets\/css\/eduflex\.css\?v=[0-9]+$/',
+        asset('assets/css/eduflex.css'));
+})());
+
+check('the token is the file\'s own modification time', (function () {
+    $expected = (string) filemtime(__DIR__ . '/../assets/css/eduflex.css');
+    return str_ends_with(asset('assets/css/eduflex.css'), '?v=' . $expected);
+})());
+
+check('it resolves the file through a "../" prefix, as the app pages write it',
+    (function () {
+        // app/*.php reach up one level. The hops are stripped only to find the
+        // file; the href itself must keep them or the link breaks.
+        $out = asset('../assets/js/eduflex.js');
+        return str_starts_with($out, '../assets/js/eduflex.js?v=')
+            && !str_ends_with($out, '?v=0');
+    })());
+
+check('a missing file degrades instead of throwing',
+    asset('assets/css/does-not-exist.css') === 'assets/css/does-not-exist.css?v=0');
+
+check('the href is escaped',
+    !str_contains(asset('assets/x".css'), 'x".css'));
+
+check('no page still links our CSS or JS without a version', (function () {
+    // The whole point. One un-versioned reference is one page that can serve a
+    // stale stylesheet after the next change.
+    $files = array_merge(
+        glob(__DIR__ . '/../*.php') ?: [],
+        glob(__DIR__ . '/../app/*.php') ?: []
+    );
+    foreach ($files as $file) {
+        $src = (string) file_get_contents($file);
+        // A raw href/src to our own asset with no query string.
+        if (preg_match('#(?:href|src)="(?:\.\./)?assets/(?:css|js)/eduflex\.(?:css|js)"#', $src)) {
+            return false;
+        }
+    }
+    return true;
+})());
+
+check('build_pages.py generates versioned links too', (function () {
+    // The eleven app pages come from the SHELL. Fixing the generated files
+    // without fixing the template means the next build undoes it.
+    $build = (string) file_get_contents(__DIR__ . '/../build_pages.py');
+    return str_contains($build, "asset('../assets/css/eduflex.css')")
+        && str_contains($build, "asset('../assets/js/eduflex.js')");
+})());
+
 /* ------------------------------------------------------------------ done */
 
 echo "\n=======================\n";

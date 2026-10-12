@@ -39,6 +39,7 @@ Browser tests need Apache and MySQL running plus `pip install playwright`:
 python3 tests/runner_browser_test.py    # practice end to end
 python3 tests/chat_browser_test.py      # the companion end to end
 python3 tests/video_browser_test.py     # the explainer dialog
+python3 tests/password_browser_test.py  # the show/hide password control
 ```
 
 **The first two drop and recreate the `eduflex` database. Never point them at
@@ -129,7 +130,19 @@ EDUFLEX_CHROMIUM="C:/Program Files/Google/Chrome/Application/chrome.exe"
     recorded in `tests/extract_test.php`. Do not tighten them by guess, and do
     not add a minimum token count: run-together text has few tokens by
     definition, which is the signal itself.
-18. Prefer `Read`/`Edit` over shell redirection for file work.
+18. **Never link `eduflex.css` or `eduflex.js` without `asset()`.** Write
+    `<?= asset('assets/js/eduflex.js') ?>`, and in `build_pages.py`'s SHELL the
+    `../` form. It appends `?v=<filemtime>` so the URL changes when the file
+    does. Apache sends no `Cache-Control` for these, so a browser is free to
+    reuse an old copy and will. On 12 October 2026 the password reveal shipped
+    working and fully tested, and on Patrick's screen the icon sat in the wrong
+    place and did nothing: the markup is rendered by PHP so it appeared at once,
+    while the stylesheet that positions it and the script that drives it both
+    came from his cache. **This bug looks like broken code to the person
+    reporting it and like working code to the person who wrote it**, which is
+    why it is worth a rule rather than a comment. `tests/auth_test.php` fails if
+    any page in the root or in `app/` links either file bare.
+19. Prefer `Read`/`Edit` over shell redirection for file work.
 
 ## The mastery model
 
@@ -232,7 +245,7 @@ partials/         sidebar.php and topbar.php for the app, public_footer.php
                   for index/login/register/privacy/terms
 database/         01_schema.sql (fresh install, destructive),
                   02_migrations.sql (existing database, safe), SCHEMA-NOTES.md
-tests/            sixteen PHP suites, three Playwright suites
+tests/            seventeen PHP suites, four Playwright suites
 tools/            rubric_run.php (the only script that spends quota),
                   migrate.php (schema changes without losing data)
 build_pages.py    regenerates app/*.php from one shell template
@@ -246,13 +259,14 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1026 PHP checks across sixteen suites, all passing, plus 111 browser checks:
+1163 PHP checks across seventeen suites, all passing, plus 134 browser checks:
 
 ```
-auth 40 | extract 44 | ai 63 | questions 73 | attempts 81 | chat 69
+auth 63 | extract 44 | ai 85 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 39 | settings 60 | security 79 | avatar 87
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
-runner_browser 54 | chat_browser 29 | video_browser 28
+verification 92
+runner_browser 54 | chat_browser 29 | video_browser 28 | password_browser 23
 ```
 
 5 of the 32 extraction checks need the PHP zip extension, because building a

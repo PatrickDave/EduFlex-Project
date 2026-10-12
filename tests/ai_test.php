@@ -266,6 +266,140 @@ check('the provider reason is passed through',
     is_string($bad['error']) && str_contains($bad['error'], 'rate limit'));
 check('no topics were invented',        $bad['topics'] === 0);
 
+section('A 429 that is not a rate limit');
+
+/* 12 October 2026. Patrick's first real key authenticated perfectly and then
+   reported "The provider rate limit was reached. Tried 3 times." It was not
+   throttled. OpenAI returns 429 with type "insufficient_quota" when the account
+   has no credit, and the driver was treating every 429 the same: three round
+   trips, then a message pointing at the rate tier instead of the billing page.
+
+   Only the response body separates the two, so these assert the body is read.
+   Getting this wrong costs retries during a defense and sends you to the wrong
+   settings screen. */
+
+check('the real OpenAI no-credit body is recognised',
+    ai_body_is_out_of_credit('{"error":{"message":"You have no credits remaining. '
+        . 'Add credits to continue using the API at https://platform.openai.com/'
+        . 'settings/organization/billing/.","type":"insufficient_quota",'
+        . '"param":null,"code":"credit_balance_exhausted"}}'));
+
+check('the older billing_hard_limit_reached spelling is recognised',
+    ai_body_is_out_of_credit('{"error":{"type":"insufficient_quota",'
+        . '"code":"billing_hard_limit_reached"}}'));
+
+/* This assertion used to run the other way, and that was the defect. The
+   sentence "you exceeded your current quota" is what BOTH a dead OpenAI account
+   and a throttled Gemini free tier say, so on its own it decides nothing. A
+   provider that means billing always says so in a structured field. */
+check('the quota sentence alone is NOT enough to call it a billing problem',
+    !ai_body_is_out_of_credit('{"error":{"message":"You exceeded your current quota."}}'));
+
+check('a genuine rate limit is NOT mistaken for no credit',
+    !ai_body_is_out_of_credit('{"error":{"message":"Rate limit reached for gpt-4o-mini '
+        . 'in organization org-x on requests per min.","type":"requests",'
+        . '"code":"rate_limit_exceeded"}}'));
+
+check('a rate-limit message that happens to say "quota" is not caught',
+    !ai_body_is_out_of_credit('{"error":{"message":"Request too large. Your quota '
+        . 'allows 30000 tokens per minute.","code":"rate_limit_exceeded"}}'));
+
+/* The regression this file exists to prevent, captured verbatim from Google on
+   12 October 2026. Gemini's free-tier THROTTLE tells you to check your billing,
+   so any matcher that reads the prose reports a dead account while the very
+   next call succeeds. That is precisely what happened to Patrick: the companion
+   said "no credit left" with interaction #41 sitting in ai_interaction having
+   returned a full set of questions a minute earlier. */
+$geminiThrottle = '{"error":{"code":429,"message":"You exceeded your current quota, '
+    . 'please check your plan and billing details. For more information on this error, '
+    . 'head to: https://ai.google.dev/gemini-api/docs/rate-limits. '
+    . '\n* Quota exceeded for metric: generativelanguage.googleapis.com/'
+    . 'generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash'
+    . 'Please retry in 8h45m30.388394773s.","status":"RESOURCE_EXHAUSTED",'
+    . '"details":[{"@type":"type.googleapis.com/google.rpc.QuotaFailure",'
+    . '"violations":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier",'
+    . '"quotaValue":"20"}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo",'
+    . '"retryDelay":"31530s"}]}}';
+
+check('Gemini free-tier throttling is NOT reported as a billing problem',
+    !ai_body_is_out_of_credit($geminiThrottle));
+
+check('RESOURCE_EXHAUSTED alone is enough to rule out a billing problem',
+    !ai_body_is_out_of_credit('{"error":{"status":"RESOURCE_EXHAUSTED",'
+        . '"message":"check your plan and billing details"}}'));
+
+section('Reading how long to wait');
+
+check('the retry delay is read out of the RetryInfo detail',
+    ai_retry_after_seconds($geminiThrottle) === 31530);
+
+check('a body with no RetryInfo returns null',
+    ai_retry_after_seconds('{"error":{"code":429,"message":"slow down"}}') === null);
+
+check('a body that is not JSON returns null',
+    ai_retry_after_seconds('<html>502</html>') === null);
+
+check('fractional seconds are rounded, not rejected',
+    ai_retry_after_seconds('{"error":{"details":[{"retryDelay":"12.7s"}]}}') === 13);
+
+check('hours and minutes read the way a person would say them',
+    ai_format_duration(31530) === '8h 45m');
+check('a whole number of hours drops the minutes',
+    ai_format_duration(7200) === '2h');
+check('under an hour is minutes',   ai_format_duration(300) === '5m');
+check('under a minute is seconds',  ai_format_duration(45) === '45s');
+
+check('an empty body is not treated as no credit',
+    !ai_body_is_out_of_credit(''));
+
+check('a body that is not JSON at all does not crash it',
+    !ai_body_is_out_of_credit('<html><body>502 Bad Gateway</body></html>'));
+
+check('a success body is not treated as no credit',
+    !ai_body_is_out_of_credit('{"choices":[{"message":{"content":"hello"}}]}'));
+
+section('Gemini must not be left thinking');
+
+/* 12 October 2026. Current Gemini Flash models reason before answering, and the
+   reasoning comes out of maxOutputTokens. Measured on gemini-3.5-flash asked for
+   three short JSON objects in a 300-token cap: 284 thought tokens, 12 output
+   tokens, finishReason MAX_TOKENS, and a reply truncated to `{"ok":`.
+
+   EduFlex caps output hard on purpose: 900 tokens for topics and chat, 2600 for
+   a set of 8 questions. With thinking left on, generation returns half a JSON
+   document, questions_validate() rejects the set as malformed, and the Chapter
+   IV rejection rate ends up measuring the token cap rather than the model.
+
+   This is a source-level check rather than a live one, because the suite must
+   keep working with no key, no network and no quota. It cannot prove the
+   provider honours the field; tools/ai_ping.php does that in one real call.
+   What it does prove is that nobody has quietly deleted it. */
+
+$aiSource = (string) file_get_contents(__DIR__ . '/../includes/ai.php');
+
+check('the Gemini driver sends a thinking budget', (function () use ($aiSource) {
+    $gemini = (string) (strstr($aiSource, 'class GeminiProvider') ?: '');
+    return str_contains($gemini, 'thinkingConfig');
+})());
+
+check('and that budget is zero', (function () use ($aiSource) {
+    $gemini = (string) (strstr($aiSource, 'class GeminiProvider') ?: '');
+    return (bool) preg_match("/'thinkingBudget'\s*=>\s*0\b/", $gemini);
+})());
+
+check('it is set for every call, not only the JSON ones', (function () use ($aiSource) {
+    // A budget applied only inside "if ($wantJson)" would leave chat and any
+    // future plain-text call still burning its cap on reasoning.
+    $gemini = (string) (strstr($aiSource, 'class GeminiProvider') ?: '');
+    $budgetAt = strpos($gemini, 'thinkingBudget');
+    $jsonAt   = strpos($gemini, 'if ($wantJson)');
+    return $budgetAt !== false && $jsonAt !== false && $budgetAt < $jsonAt;
+})());
+
+// CHAT_CONTEXT_CHUNKS lives in chat.php, which this suite does not load.
+check('the cap it protects is still the one that was measured against',
+    QUESTIONS_PER_SET === 8);
+
 section('Guard clauses');
 
 ai_provider(new MockProvider());
