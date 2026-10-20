@@ -400,6 +400,72 @@ check('it is set for every call, not only the JSON ones', (function () use ($aiS
 check('the cap it protects is still the one that was measured against',
     QUESTIONS_PER_SET === 8);
 
+section('The model echoing the prompt back');
+
+/* 20 October 2026, the first topic detection against a real document: the model
+   returned "One sentence on what the excerpt says about it" as a topic name. It
+   is the literal placeholder from the JSON shape in topics_system_prompt(), and
+   it was stored and shown to the learner as something to go and study.
+
+   The guard that should have caught it rejects a name over ten words, because a
+   sentence in a name field is a summary in the wrong place. That phrase is NINE
+   words. It is the kind of defect a panel notices immediately, because it is
+   visible on the screen rather than buried in a number. */
+
+check('the exact phrase that leaked is rejected',
+    topics_is_prompt_echo('One sentence on what the excerpt says about it'));
+
+check('and with the trailing period the template actually carries',
+    topics_is_prompt_echo('One sentence on what the excerpt says about it.'));
+
+check('case and spacing do not let it through',
+    topics_is_prompt_echo('  ONE SENTENCE  ON WHAT THE EXCERPT SAYS ABOUT IT '));
+
+check('the topic-name placeholder is rejected too',
+    topics_is_prompt_echo('Short topic name, 2 to 6 words'));
+
+check('so is the keywords placeholder', topics_is_prompt_echo('term'));
+
+check('anything still naming the excerpt is rejected',
+    // The prompt says in as many words never to do this, so a name that still
+    // contains it is the model discussing the instructions.
+    topics_is_prompt_echo('Main idea of the excerpt'));
+
+check('real topics from this very document are NOT rejected', (function () {
+    // Taken verbatim from the 25 the manuscript produced. A fix that also threw
+    // these away would be worse than the bug.
+    foreach ([
+        'Bloom\'s Revised Taxonomy',
+        'Self-Directed and Self-Regulated Learning',
+        'Scope and Limitations of Educational AI Systems',
+        'Generative AI and Large Language Models',
+        'System Evaluation Metrics and Interpretation',
+        'Purposive Sampling',
+        'Constructivism in Learning Theory',
+    ] as $real) {
+        if (topics_is_prompt_echo($real)) { return false; }
+    }
+    return true;
+})());
+
+check('the parser drops it, not just the helper', (function () {
+    // End to end through topics_parse_reply(), which is where the bad row came
+    // from. One good topic alongside it must survive.
+    $parsed = topics_parse_reply(['topics' => [
+        ['topic' => 'One sentence on what the excerpt says about it.', 'summary' => 'x'],
+        ['topic' => 'Bloom\'s Revised Taxonomy', 'summary' => 'y'],
+    ]]);
+    return count($parsed) === 1 && $parsed[0]['topic'] === 'Bloom\'s Revised Taxonomy';
+})());
+
+check('the placeholder list still matches the prompt it came from', (function () {
+    // If the JSON shape in topics_system_prompt() is reworded, these strings
+    // stop matching anything and the guard silently stops guarding.
+    $prompt = topics_system_prompt();
+    return str_contains($prompt, 'One sentence on what the excerpt says about it.')
+        && str_contains($prompt, 'Short topic name, 2 to 6 words');
+})());
+
 section('Guard clauses');
 
 ai_provider(new MockProvider());

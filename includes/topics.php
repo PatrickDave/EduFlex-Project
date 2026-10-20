@@ -116,6 +116,48 @@ function topics_clean_name(string $name): string
 }
 
 /**
+ * Is this "topic" just the prompt's own example text handed back?
+ *
+ * 20 October 2026, detecting topics on the team's own manuscript: the model
+ * returned "One sentence on what the excerpt says about it" as a topic name,
+ * and it was stored and shown to the learner as something to study.
+ *
+ * It is the literal placeholder from the JSON shape in topics_system_prompt().
+ * The existing guard rejects a name over ten words, on the reasoning that a
+ * sentence in a name field is a summary in the wrong place. That phrase is
+ * NINE words, so it walked straight through.
+ *
+ * A longer list of placeholders is not the answer either, because the real
+ * problem is narrow and specific: a model echoing the template back. So the
+ * check is against the template's own strings, kept beside the prompt they come
+ * from, plus the one word the prompt explicitly forbids. If the shape in
+ * topics_system_prompt() is ever reworded, reword these with it.
+ */
+function topics_is_prompt_echo(string $name): bool
+{
+    $normalised = rtrim(mb_strtolower(trim((string) preg_replace('/\s+/', ' ', $name))), '.');
+
+    // Verbatim placeholders from the JSON shape in topics_system_prompt().
+    $placeholders = [
+        'one sentence on what the excerpt says about it',
+        'short topic name, 2 to 6 words',
+        'short topic name',
+        'topic name',
+        'term',
+    ];
+
+    if (in_array($normalised, $placeholders, true)) {
+        return true;
+    }
+
+    /* The prompt says in as many words: never turn the word "excerpt" into a
+       topic. A name that still contains it is the model talking about the
+       instructions rather than about the material. No real study topic in a
+       student's reviewer is named after an excerpt. */
+    return str_contains($normalised, 'excerpt');
+}
+
+/**
  * Pull valid topics out of one model reply, discarding anything malformed.
  *
  * Never trust the shape. A model can return the right JSON with the wrong keys,
@@ -155,6 +197,11 @@ function topics_parse_reply(?array $data): array
         }
         // A "topic" running to a whole sentence is a summary in the wrong field.
         if (str_word_count($name) > 10) {
+            continue;
+        }
+        // ...and a "topic" that is the prompt's own example text is the model
+        // echoing the instructions. Nine words, so the check above misses it.
+        if (topics_is_prompt_echo($name)) {
             continue;
         }
 

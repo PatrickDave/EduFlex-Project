@@ -259,10 +259,10 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1163 PHP checks across seventeen suites, all passing, plus 134 browser checks:
+1172 PHP checks across seventeen suites, all passing, plus 134 browser checks:
 
 ```
-auth 63 | extract 44 | ai 85 | questions 73 | attempts 81 | chat 69
+auth 63 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 39 | settings 60 | security 79 | avatar 87
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
 verification 92
@@ -387,6 +387,36 @@ Known and NOT caused by the video: `index.php` scrolls sideways by about 123px
 at 390px wide. The Methodology card holds a `<pre class="ef-formula">` that
 cannot wrap and an `.ef-table` of Bloom weights, and together they force a 493px
 floor. It predates the video and is still unfixed.
+
+## The first real topic detection, and what it caught
+
+20 October 2026. The manuscript was ingested for user 10 as resource 10 and
+detection run against it: **29 chunks, 12 sampled, 10 succeeded, 2 failed with
+Gemini's transient 503, 24 topics kept.** That is the material the rubric run
+should use, not `Discrete_Math_1`, which is 2 chunks and would have measured its
+own thinness.
+
+It returned **"One sentence on what the excerpt says about it"** as a topic, and
+it was stored and shown as something to study. That string is the literal
+placeholder from the JSON shape in `topics_system_prompt()`. The guard that
+should have stopped it rejects a name over ten words, on the reasoning that a
+sentence in a name field is a summary in the wrong place; the phrase is NINE
+words and walked straight through.
+
+`topics_is_prompt_echo()` is the fix, and it checks against the template's own
+strings, deliberately kept next to the prompt they come from. **If the JSON
+shape in `topics_system_prompt()` is ever reworded, reword the placeholder list
+with it**, or the guard silently stops guarding. `tests/ai_test.php` asserts the
+two strings still appear in the prompt for exactly that reason, and asserts that
+seven real topics from this document are not caught by the fix.
+
+The bad row (topic_progress_id 44) was deleted after confirming it had no
+mastery, no scored items and nothing referencing it.
+
+Worth knowing for the write-up: the 24 topics contain real near-duplicates
+("Self-Directed Learning", "Self-Directed Learning Technology", "Self-Directed
+and Self-Regulated Learning"). Merging is per-reply, so the same concept found
+in two different chunks survives twice. Not a defect, but a panel may ask.
 
 ## Still to do
 
