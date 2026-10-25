@@ -1899,7 +1899,57 @@ p { margin: 0; }
   background: linear-gradient(90deg, #F5FAFE 0%, #FFFFFF 50%, #F2FBFA 100%);
   display: flex; flex-direction: column;
 }
+/* .ef-topnav carries "max-width: 1440px; margin: 0 auto", which is right on the
+   landing page because its parent is a plain block. On the auth pages the
+   parent is .ef-auth-page, a FLEX COLUMN, and an auto margin in flexbox absorbs
+   the free space rather than centring a stretched item: the nav shrink-wraps to
+   its contents instead of spanning the page.
+
+   On 25 October 2026 that put the logo and "Back to Home" touching in the
+   middle of the login page, because justify-content: space-between had no free
+   space left to distribute. A definite width restores the stretch and leaves
+   the max-width and centring doing what they were written to do. */
+.ef-auth-page > .ef-topnav { width: 100%; }
+
 .ef-auth-body { flex: 1 1 auto; display: grid; place-items: center; padding: 40px 20px; }
+
+/* Holds the back link and the card in one column so the link lines up with the
+   card's left edge rather than floating off on its own. Same max-width as the
+   card, so the two edges agree at every screen size. */
+.ef-auth-stack { width: 100%; max-width: 420px; }
+
+.ef-auth-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 14px;
+  padding: 6px 12px 6px 10px;
+  border-radius: var(--ef-r-pill);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ef-text-2);
+  text-decoration: none;
+  transition: color .2s ease, background .2s ease;
+}
+.ef-auth-back:hover,
+.ef-auth-back:focus-visible {
+  color: var(--ef-primary);
+  background: var(--ef-surface-subtle);
+}
+.ef-auth-back:focus-visible {
+  outline: 2px solid var(--ef-primary-bright);
+  outline-offset: 1px;
+}
+/* The arrow leads the eye back the way it points, the mirror of the play
+   triangle nudging forward on the landing page. */
+.ef-auth-back svg { transition: transform .25s cubic-bezier(.34, 1.56, .64, 1); }
+.ef-auth-back:hover svg { transform: translateX(-3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-auth-back,
+  .ef-auth-back svg { transition: none !important; }
+  .ef-auth-back:hover svg { transform: none; }
+}
 .ef-auth-card {
   width: 100%; max-width: 420px;
   background: var(--ef-surface);

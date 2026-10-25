@@ -291,6 +291,86 @@ check('the input is padded so a long password cannot run under the button',
         return (bool) preg_match('/\.ef-password\s+\.ef-input\s*\{[^}]*padding-right:\s*4[0-9]px/s', $css);
     })());
 
+/* ------------------------------------------------------ the auth page nav */
+
+section('Back to Home, and the nav it used to collide with');
+
+/* 25 October 2026. On the login page the logo and "Back to Home" rendered
+   touching, in the middle of the page.
+
+   .ef-topnav carries "max-width: 1440px; margin: 0 auto", which is right on the
+   landing page because its parent is a plain block. On the auth pages the
+   parent is .ef-auth-page, a flex column, and an auto margin in flexbox absorbs
+   free space rather than centring a stretched item: the nav shrink-wrapped to
+   its contents, 283px inside a 1280px window, so justify-content: space-between
+   had nothing left to distribute.
+
+   The link now sits above the card and lines up with its left edge, which is
+   where Patrick asked for it, and the nav is forced back to full width. */
+
+check('the auth nav is forced to stretch inside the flex column', (function () {
+    $css = (string) file_get_contents(__DIR__ . '/../assets/css/eduflex.css');
+    return (bool) preg_match('/\.ef-auth-page\s*>\s*\.ef-topnav\s*\{[^}]*width:\s*100%/s', $css);
+})());
+
+check('the fix is scoped to the auth pages', (function () {
+    // index.php, privacy.php and terms.php put .ef-topnav inside .ef-public,
+    // a plain block, where it is already full width and correct. A bare
+    // ".ef-topnav { width: 100% }" would be a change they never asked for.
+    $css = (string) file_get_contents(__DIR__ . '/../assets/css/eduflex.css');
+    return str_contains($css, '.ef-auth-page > .ef-topnav');
+})());
+
+$login = (string) file_get_contents(__DIR__ . '/../login.php');
+
+check('login has a Back to Home link', str_contains($login, 'Back to Home'));
+
+check('it is out of the nav and above the card', (function () use ($login) {
+    $nav   = (int) strpos($login, '<nav class="ef-topnav">');
+    $navEnd = (int) strpos($login, '</nav>');
+    $back  = (int) strpos($login, 'ef-auth-back');
+    $card  = (int) strpos($login, 'ef-auth-card');
+    return $back > $navEnd && $back < $card;
+})());
+
+check('the link and the card share a wrapper, so their left edges agree',
+    str_contains($login, 'ef-auth-stack'));
+
+check('the wrapper is the same width as the card', (function () {
+    // 420px both. If one changes and the other does not, the link stops lining
+    // up with the card and the whole point of the move is lost.
+    $css = (string) file_get_contents(__DIR__ . '/../assets/css/eduflex.css');
+    preg_match('/\.ef-auth-stack\s*\{[^}]*max-width:\s*(\d+)px/s', $css, $stack);
+    preg_match('/\.ef-auth-card\s*\{[^}]*max-width:\s*(\d+)px/s', $css, $card);
+    return !empty($stack[1]) && !empty($card[1]) && $stack[1] === $card[1];
+})());
+
+check('the wrapper is opened once and closed', (function () use ($login) {
+    // An unclosed wrapper swallows whatever follows and the page still renders,
+    // which is exactly how it would go unnoticed. Counted on the class
+    // attribute, because the closing marker is a comment naming the same class.
+    return substr_count($login, 'class="ef-auth-stack"') === 1
+        && str_contains($login, '/.ef-auth-stack');
+})());
+
+check('the arrow is inline SVG, not an icon font', (function () use ($login) {
+    $from = (int) strpos($login, 'ef-auth-back');
+    $slice = substr($login, $from, 400);
+    return str_contains($slice, '<svg') && str_contains($slice, 'stroke="currentColor"');
+})());
+
+check('the arrow is hidden from screen readers, the link carries the text',
+    (function () use ($login) {
+        $from = (int) strpos($login, 'ef-auth-back');
+        return str_contains(substr($login, $from, 400), 'aria-hidden="true"');
+    })());
+
+check('reduced motion stops the arrow moving', (function () {
+    $css = (string) file_get_contents(__DIR__ . '/../assets/css/eduflex.css');
+    $block = (string) (strstr($css, '@media (prefers-reduced-motion: reduce)') ?: '');
+    return str_contains($block, '.ef-auth-back');
+})());
+
 /* --------------------------------------------------------- cache busting */
 
 section('Our own CSS and JS carry a version');

@@ -66,11 +66,26 @@ $justDeleted = isset($_GET['deleted']);
 
   <nav class="ef-topnav">
     <a href="index.php" class="ef-logo">EduFlex</a>
-    <a href="index.php" class="ef-second" style="font-size:13px;font-weight:500;">Back to Home</a>
   </nav>
 
   <main class="ef-auth-body">
-    <div class="ef-auth-card">
+    <?php /* "Back to Home" sits above the card and lines up with its left edge,
+             rather than in the nav beside the logo. Two reasons: it reads as a
+             way out of this form rather than as navigation for the whole site,
+             and in the nav it collided with the logo, because .ef-topnav
+             shrink-wraps inside the flex column .ef-auth-page. The collision is
+             fixed in the stylesheet either way. */ ?>
+    <div class="ef-auth-stack">
+
+      <a href="index.php" class="ef-auth-back">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M9.8 3.4 5.2 8l4.6 4.6" stroke="currentColor"
+                stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Back to Home
+      </a>
+
+      <div class="ef-auth-card">
 
       <h2>Welcome Back</h2>
       <p class="ef-auth-sub">Access your personalized AI learning path</p>
@@ -139,7 +154,9 @@ $justDeleted = isset($_GET['deleted']);
       <p class="ef-auth-foot">
         Don't have an account? <a href="register.php">Sign Up</a>
       </p>
-    </div>
+      </div><!-- /.ef-auth-card -->
+
+    </div><!-- /.ef-auth-stack -->
   </main>
 
 <?php include __DIR__ . '/partials/public_footer.php'; ?>

@@ -271,10 +271,10 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1172 PHP checks across seventeen suites, all passing, plus 169 browser checks:
+1182 PHP checks across seventeen suites, all passing, plus 169 browser checks:
 
 ```
-auth 63 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
+auth 73 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 39 | settings 60 | security 79 | avatar 87
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
 verification 92
