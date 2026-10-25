@@ -40,6 +40,7 @@ python3 tests/runner_browser_test.py    # practice end to end
 python3 tests/chat_browser_test.py      # the companion end to end
 python3 tests/video_browser_test.py     # the explainer dialog
 python3 tests/password_browser_test.py  # the show/hide password control
+python3 tests/modules_browser_test.py   # all 34 Appendix R sub-modules
 ```
 
 **The first two drop and recreate the `eduflex` database. Never point them at
@@ -245,7 +246,7 @@ partials/         sidebar.php and topbar.php for the app, public_footer.php
                   for index/login/register/privacy/terms
 database/         01_schema.sql (fresh install, destructive),
                   02_migrations.sql (existing database, safe), SCHEMA-NOTES.md
-tests/            seventeen PHP suites, four Playwright suites
+tests/            seventeen PHP suites, five Playwright suites
 tools/            rubric_run.php (the only script that spends quota),
                   migrate.php (schema changes without losing data)
 build_pages.py    regenerates app/*.php from one shell template
@@ -259,7 +260,7 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1172 PHP checks across seventeen suites, all passing, plus 134 browser checks:
+1172 PHP checks across seventeen suites, all passing, plus 169 browser checks:
 
 ```
 auth 63 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
@@ -267,6 +268,7 @@ notifications 77 | support 39 | settings 60 | security 79 | avatar 87
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
 verification 92
 runner_browser 54 | chat_browser 29 | video_browser 28 | password_browser 23
+modules_browser 35
 ```
 
 5 of the 32 extraction checks need the PHP zip extension, because building a
@@ -417,6 +419,57 @@ Worth knowing for the write-up: the 24 topics contain real near-duplicates
 ("Self-Directed Learning", "Self-Directed Learning Technology", "Self-Directed
 and Self-Regulated Learning"). Merging is per-reply, so the same concept found
 in two different chunks survives twice. Not a defect, but a panel may ask.
+
+## The Appendix R module audit
+
+`tests/modules_browser_test.py` walks the real application as a learner and
+reports, for each of the 34 sub-modules in the adviser-approved Appendix R,
+whether it actually works. Run it before a consultation: it prints the
+per-module tally that feeds the consultation form's scoring, which is one point
+per module per user, Guest 1 plus Learner 7, so eight points.
+
+**25 October 2026: 35 of 35 checks pass, 8 of 8 points.** The first consultation
+on 20 September scored 3 of 8, or 37.5 percent.
+
+It is self-contained and non-destructive. It registers its own throwaway
+account, uploads its own `.txt` through the real form, and removes the account
+afterwards through `auth_delete_account()`, the learner's own withdrawal
+mechanism, which also deletes the file it uploaded.
+
+`tests/modules_fixture.php` writes the three things a browser cannot without
+spending quota: topics, one conversation turn, and one completed practice
+attempt. Only the question text is invented. The attempt runs through
+`attempt_start()`, `attempt_answer()` and `attempt_finish()`, so mastery,
+banding and the recommendation are genuinely computed rather than written by
+hand. Without that attempt the dashboard sits in its empty state, because
+`stats_empty_state()` suppresses the recommendation until there are scored
+answers, and sub-modules 4.4, 4.5, 5.1, 5.2 and 5.4 cannot be exercised at all.
+
+**Two traps this suite exists to remember, both hit while writing it:**
+
+- **Seed data must never point at a real learner's file.** The first version
+  copied `storage_path` from Patrick's manuscript row, and
+  `auth_delete_account()` removes uploaded files from disk. Deleting the
+  throwaway accounts would have taken his 16 MB document with them. It was
+  caught one command before the delete. `modules_fixture.php` now refuses any
+  address not starting `modaudit_`, and the suite uploads its own file so there
+  is no shared path at all.
+- **`form button[type='submit']` is not the form you mean.** The sidebar's
+  sign-out form comes first in the DOM, so a loose selector signs the run out
+  halfway through and every later check fails for the wrong reason. Target the
+  action: `form[action*='support_submit'] button`.
+
+Two sub-modules cannot be proven without a live model call: 4.1 Detect Topics
+and 3.1 Ask the Companion. The suite checks the control is present and wired and
+says so in its output rather than claiming more than it has shown.
+`tools/ai_ping.php` proves the provider itself for one request.
+
+**The approved Appendix R and `includes/manuscript.php` do not list the same
+sub-modules.** Both total 34, but Appendix R Module 1 has "View Landing Page"
+and no "Manage Subscription", while `manuscript.php` has "Manage subscription"
+and no "View Landing Page". The landing page therefore advertises a sub-module
+the adviser did not approve and omits one he did. The wording differs throughout
+as well, which is cosmetic; that swap is not.
 
 ## Still to do
 
