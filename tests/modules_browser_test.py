@@ -84,8 +84,36 @@ sample_path = os.path.join(tempfile.gettempdir(), "eduflex_audit_sample.txt")
 with open(sample_path, "w", encoding="utf-8") as handle:
     handle.write(SAMPLE)
 
+def stop(message):
+    """Fail with something a person can act on, not a stack trace."""
+    print("\n  " + message)
+    sys.exit(2)
+
+
+# Pre-flight. Both of these fail in ways that read as "the suite is broken"
+# rather than "the thing it needs is not running".
+try:
+    import urllib.request
+    urllib.request.urlopen(BASE + "/index.php", timeout=10).read(64)
+except Exception:
+    stop("Cannot reach %s\n  Start Apache in the XAMPP Control Panel, or set "
+         "EDUFLEX_BASE if your URL differs." % BASE)
+
+if not os.path.isfile(PHP):
+    stop("No PHP at %s\n  Set EDUFLEX_PHP to your php.exe." % PHP)
+
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=CHROME)
+    try:
+        browser = p.chromium.launch(executable_path=CHROME)
+    except Exception as exc:
+        stop("Could not start a browser.\n"
+             "  playwright install chromium times out on this connection, so point\n"
+             "  the suite at the Chrome already installed:\n\n"
+             "    PowerShell:  $env:EDUFLEX_CHROMIUM = "
+             "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\"\n"
+             "    bash:        export EDUFLEX_CHROMIUM="
+             "\"/c/Program Files/Google/Chrome/Application/chrome.exe\"\n\n"
+             "  (%s)" % str(exc).splitlines()[0][:120])
     context = browser.new_context(viewport={"width": 1440, "height": 950})
     page = context.new_page()
     js_errors = []

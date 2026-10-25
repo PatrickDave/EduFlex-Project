@@ -33,20 +33,31 @@ php tools/migrate.php --apply    # add it
 ./run_tests.sh
 ```
 
-Browser tests need Apache and MySQL running plus `pip install playwright`:
+Browser tests need Apache and MySQL running plus `pip install playwright`.
+
+**On Patrick's machine the command is `python`, not `python3`.** Typing
+`python3` there opens the Microsoft Store prompt and does nothing, which is
+exactly how it reads as "the test is broken". Open PowerShell, then:
 
 ```
-python3 tests/runner_browser_test.py    # practice end to end
-python3 tests/chat_browser_test.py      # the companion end to end
-python3 tests/video_browser_test.py     # the explainer dialog
-python3 tests/password_browser_test.py  # the show/hide password control
-python3 tests/modules_browser_test.py   # all 34 Appendix R sub-modules
+cd C:\xampp\htdocs\eduflex-ui
+$env:EDUFLEX_CHROMIUM = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+python tests\modules_browser_test.py   # all 34 Appendix R sub-modules
+python tests\video_browser_test.py     # the explainer dialog
+python tests\password_browser_test.py  # the show/hide password control
+python tests\runner_browser_test.py    # practice end to end
+python tests\chat_browser_test.py      # the companion end to end
 ```
 
-**The first two drop and recreate the `eduflex` database. Never point them at
-data worth keeping.** `video_browser_test.py` is the exception: it only reads
-the public landing page, needs no database and no MySQL, and is safe to run
-against Patrick's working install.
+The `$env:` line lasts only for that window, so set it again each time you open
+a new one. On Mac or Linux it is `python3` and `export EDUFLEX_CHROMIUM=...`,
+and that variable can be left unset once `playwright install chromium` has run.
+
+**`runner_browser_test.py` and `chat_browser_test.py` drop and recreate the
+`eduflex` database. Never point them at data worth keeping.** The other three
+are safe against Patrick's working install: `video` and `password` only read
+public pages, and `modules` creates and deletes its own throwaway account.
 
 `playwright install chromium` times out on this connection. Point the suites at
 the Chrome that is already installed instead:
