@@ -232,6 +232,250 @@ p { margin: 0; }
 }
 .ef-chip:hover { border-color: var(--ef-primary-bright); color: var(--ef-primary); }
 
+/* ---- The support queue (app/admin.php) ---------------------------------
+
+   The project team's view of Module 7. Reuses .ef-chip for the filters and
+   .ef-band for the status pill, so a request's status looks the same here as it
+   does on the learner's own Support page.
+   -------------------------------------------------------------------------- */
+
+.ef-admin-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.ef-admin-count {
+  flex: 1 1 110px;
+  padding: 14px 16px;
+  border: 1px solid var(--ef-border);
+  border-radius: var(--ef-r-md);
+  background: var(--ef-surface);
+}
+.ef-admin-count-n {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ef-text);
+}
+.ef-admin-count-l {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--ef-text-muted);
+}
+
+/* ---- The team's sign-in (admin_login.php) ----
+
+   A door of its own, as asked for on 1 November 2026. It has to look like a
+   different door at a glance, or a team member who lands on the wrong one from
+   a bookmark will not notice. Same card, marked. */
+.ef-auth-card-admin { border-top: 3px solid var(--ef-primary); }
+
+/* ---- Help and FAQ (app/help.php) ----------------------------------------
+
+   <details> rather than a JavaScript accordion: it opens with the keyboard,
+   the browser's own find-in-page can search inside a closed one in modern
+   engines, and it still works if the script fails to load.
+   -------------------------------------------------------------------------- */
+
+.ef-help-steps {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--ef-text-2);
+}
+.ef-help-steps li { margin-bottom: 11px; }
+.ef-help-steps li:last-child { margin-bottom: 0; }
+.ef-help-steps strong { color: var(--ef-text); }
+
+.ef-help-faq { display: flex; flex-direction: column; gap: 2px; }
+
+.ef-help-item { border-bottom: 1px solid var(--ef-border); }
+.ef-help-item:last-child { border-bottom: 0; }
+
+.ef-help-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 2px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ef-text);
+  list-style: none;
+  transition: color .18s ease;
+}
+/* The default triangle, removed in both engines that draw one. */
+.ef-help-item summary::-webkit-details-marker { display: none; }
+.ef-help-item summary::marker { content: ''; }
+
+/* A chevron that turns, drawn in CSS so rule 3 is not involved. */
+.ef-help-item summary::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+  opacity: .5;
+  transition: transform .22s ease;
+}
+.ef-help-item[open] summary::after {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+.ef-help-item summary:hover { color: var(--ef-primary); }
+.ef-help-item summary:focus-visible {
+  outline: 2px solid var(--ef-primary-bright);
+  outline-offset: 2px;
+  border-radius: var(--ef-r-sm);
+}
+
+.ef-help-item p {
+  margin: 0 0 14px;
+  padding-right: 20px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ef-text-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-help-item summary,
+  .ef-help-item summary::after { transition: none !important; }
+}
+
+/* The User / Admin switch at the top of both sign-in cards. Two links styled
+   as one segmented control: it works with no JavaScript, and the address bar
+   always says which door you are standing at. */
+.ef-auth-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 22px;
+  padding: 4px;
+  border-radius: var(--ef-r-pill);
+  background: var(--ef-surface-subtle);
+  border: 1px solid var(--ef-border);
+}
+.ef-auth-tab {
+  flex: 1 1 0;
+  padding: 9px 14px;
+  border-radius: var(--ef-r-pill);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ef-text-2);
+  text-decoration: none;
+  transition: background .2s ease, color .2s ease, box-shadow .2s ease;
+}
+.ef-auth-tab:hover { color: var(--ef-primary); }
+.ef-auth-tab.is-on {
+  background: var(--ef-primary);
+  color: var(--ef-on-primary);
+  box-shadow: var(--ef-shadow-sm);
+}
+.ef-auth-tab:focus-visible {
+  outline: 2px solid var(--ef-primary-bright);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ef-auth-tab { transition: none !important; }
+}
+
+/* The one number the team actually cares about on opening the help desk:
+   how much is still on them. */
+.ef-admin-headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  border-color: var(--ef-primary-bright);
+  background: linear-gradient(135deg, var(--ef-surface) 0%, var(--ef-surface-sky) 100%);
+}
+.ef-admin-headline-n {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ef-primary);
+}
+.ef-admin-headline-l {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--ef-text-2);
+}
+
+.ef-admin-typerow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--ef-text-2);
+  border-bottom: 1px solid var(--ef-border);
+}
+.ef-admin-typerow:last-of-type { border-bottom: 0; }
+.ef-admin-typerow-n {
+  font-weight: 700;
+  color: var(--ef-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.ef-admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ef-admin-filter-label {
+  font-size: 12px;
+  color: var(--ef-text-muted);
+  min-width: 44px;
+}
+/* The chip for the filter currently in force. Without this every chip looks
+   identical and there is no way to tell what you are looking at. */
+.ef-chip.is-on {
+  border-color: var(--ef-primary);
+  background: var(--ef-surface-sky);
+  color: var(--ef-primary);
+  font-weight: 600;
+}
+
+.ef-admin-req { margin-bottom: 12px; }
+.ef-admin-req-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.ef-admin-req-type {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ef-primary);
+}
+/* A learner can paste up to SUPPORT_MESSAGE_MAX characters, so this must wrap
+   rather than stretch the card. */
+.ef-admin-req-body {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ef-text-2);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ef-admin-req-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ef-border);
+}
+
 /* Mastery band pill. Class is driven by the computed band, never by hand. */
 .ef-band {
   display: inline-block;

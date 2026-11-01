@@ -50,6 +50,7 @@ CREATE TABLE user (
   email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
   program TEXT NOT NULL DEFAULT '', year_level INTEGER NOT NULL DEFAULT 1,
   account_status TEXT NOT NULL DEFAULT 'active',
+  is_admin INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE subscription (
   subscription_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,

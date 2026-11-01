@@ -37,6 +37,10 @@ const NOTIFY_TYPES = [
     'topics_found'   => 'Topics found',
     'topic_mastered' => 'Topic mastered',
     'recommendation' => 'Recommendation',
+    // Written by admin_set_status() when the project team moves a learner's
+    // support request along. Without this entry notify() would store it as
+    // 'system' and log a warning on every status change.
+    'support'        => 'Support request',
 ];
 
 /** How many rows app/notifications.php shows at once. */

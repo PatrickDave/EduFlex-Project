@@ -208,3 +208,26 @@ seven days if unused. Existing trust rows default to 0, preserving their origina
 expiry. This separates optional profile email verification from the initial
 browser grace period; subsequent new-browser or expired-trust logins still need
 an emailed code. No existing account is granted this exception retroactively.
+
+## 9. `user.is_admin`
+
+Added 1 November 2026, for the support queue in `app/admin.php`.
+
+`TINYINT(1) NOT NULL DEFAULT 0`. One flag marking a project team member who may
+read every learner's support requests and change their status.
+
+Chapter III has no admin role. The adviser asked for one at the second
+consultation, because Module 7 recorded a request and then nobody could see it:
+the `status` column was written as `open` at creation and no code ever changed
+it, so "View Request Status" showed "Recorded" forever.
+
+**It is set by hand and nothing in the interface grants it.** There is no
+promote button, no admin registration and no "first user becomes admin". A flag
+no code can write is a flag no bug can hand to a learner.
+`tests/admin_test.php` greps the source for any statement that writes it.
+
+The default of 0 means every account that existed before this column keeps being
+a plain learner.
+
+Write this into the Chapter III data dictionary before the defense, along with
+the other eight.

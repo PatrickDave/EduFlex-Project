@@ -495,8 +495,15 @@ function auth_user(): ?array
         return $cached;
     }
 
+    /* is_admin is in this list on purpose. The columns are named rather than
+       SELECT *, so a new one is invisible to every caller until it is added
+       here: admin_is_admin() reads $user['is_admin'], and without this line it
+       read a key that was never set and turned the project team away from their
+       own support queue. Found on 1 November 2026 by flipping the flag in the
+       database and watching nothing change. */
     $stmt = db()->prepare(
-        'SELECT user_id, full_name, email, program, year_level, account_status, created_at
+        'SELECT user_id, full_name, email, program, year_level, account_status,
+                is_admin, created_at
            FROM user WHERE user_id = ? LIMIT 1'
     );
     $stmt->execute([$_SESSION['user_id']]);
@@ -520,6 +527,47 @@ function auth_require_login(string $loginPath = '../login.php'): void
         return;
     }
     redirect($loginPath . '?next=' . urlencode($_SERVER['REQUEST_URI'] ?? ''));
+}
+
+/**
+ * Is this user a member of the project team?
+ *
+ * Here rather than in includes/admin.php, which is the obvious home, because
+ * only app/admin.php requires that file. The sidebar asks this question on
+ * every page, so a definition that exists on one of twelve meant the Support
+ * Queue link never appeared.
+ *
+ * Takes the row rather than reading the session, so a caller can ask about
+ * somebody other than the person signed in, and so the tests can ask with no
+ * session at all.
+ *
+ * Exactly 1, not merely truthy. The flag is set by hand in phpMyAdmin, and a
+ * loose check would let a typed "2" or "yes" open the support queue. PDO
+ * returns "1" from MySQL and 1 from SQLite, so the cast covers both.
+ */
+function admin_is_admin(?array $user): bool
+{
+    if ($user === null) {
+        return false;
+    }
+    return (int) ($user['is_admin'] ?? 0) === 1;
+}
+
+/**
+ * Where this user belongs after signing in.
+ *
+ * One login form, no ADMIN/LEARNER tabs. A second login would mean a second
+ * password rule, a second throttle and a second verification path, and a form
+ * that announces to anyone who opens it that admin accounts exist. Routing
+ * after one authentication gives the project team their own area without any
+ * of that, and leaves "there is no second login to attack" true.
+ *
+ * Used as the FALLBACK for auth_safe_redirect_target(), never instead of it: a
+ * ?next= value still has to survive that check before it is followed.
+ */
+function auth_home_for(?array $user): string
+{
+    return admin_is_admin($user) ? 'app/admin.php' : 'app/dashboard.php';
 }
 
 /**

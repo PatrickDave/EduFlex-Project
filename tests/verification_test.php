@@ -17,7 +17,7 @@ $pdo->exec('PRAGMA foreign_keys = ON');
 db_set_connection($pdo);
 $pdo->exec("CREATE TABLE user (user_id INTEGER PRIMARY KEY AUTOINCREMENT, full_name TEXT, email TEXT UNIQUE,
  password_hash TEXT, account_status TEXT DEFAULT 'active', program TEXT, year_level INTEGER, email_verified_at TEXT NULL,
- avatar_path TEXT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ avatar_path TEXT NULL, is_admin INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE subscription (user_id INTEGER UNIQUE, plan_type TEXT, status TEXT);
  CREATE TABLE notification (user_id INTEGER, notification_type TEXT, title TEXT, message TEXT);
  CREATE TABLE login_attempt (email TEXT, ip_address TEXT, attempted_at TEXT);

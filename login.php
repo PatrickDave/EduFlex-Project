@@ -9,9 +9,9 @@ require_once __DIR__ . '/includes/auth.php';
 
 auth_boot();
 
-// Already signed in? Go straight through.
+// Already signed in? Go straight through, to whichever home is theirs.
 if (auth_is_logged_in() && auth_user() !== null) {
-    redirect('app/dashboard.php');
+    redirect(auth_home_for(auth_user()));
 }
 
 $errors = [];
@@ -32,12 +32,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('verification_error', $result['verification_error'] ?? null);
             redirect('verify_email.php');
         }
+        if ($result['ok'] && admin_is_admin(auth_user())) {
+            /* A team account came through the learner door. Separate doors was
+               Patrick's decision on 1 November 2026, so end the session and
+               send them to theirs rather than quietly letting them in here.
+               They can still reach the learner screens once signed in, with
+               the Learner View link in the help desk sidebar. */
+            auth_logout();
+            /* A query flag, not a flash. auth_logout() destroys the session, so
+               anything flashed after it has nowhere to live and anything
+               flashed before it is destroyed too. The same problem was already
+               solved this way for account deletion; see $justDeleted below. */
+            redirect('admin_login.php?team=1');
+        }
+
         if ($result['ok']) {
             /* Only follow a "next" value that stays inside this application.
                The rule lives in auth_safe_redirect_target(); the check that used
                to be written inline here let `/\evil.example.com` through, which
                was a working open redirect. */
-            redirect(auth_safe_redirect_target($_POST['next'] ?? null));
+            /* The fallback is role-aware: an admin lands in the support
+               queue, a learner on their dashboard. A ?next= value still has to
+               survive auth_safe_redirect_target() before it is followed, so
+               routing by role does not reopen the redirect hole. */
+            redirect(auth_safe_redirect_target(
+                $_POST['next'] ?? null, auth_home_for(auth_user())));
         }
         $errors = $result['errors'];
     }
@@ -86,6 +105,8 @@ $justDeleted = isset($_GET['deleted']);
       </a>
 
       <div class="ef-auth-card">
+
+      <?php $current = 'user'; include __DIR__ . '/partials/auth_tabs.php'; ?>
 
       <h2>Welcome Back</h2>
       <p class="ef-auth-sub">Access your personalized AI learning path</p>

@@ -16,6 +16,27 @@ auth_require_login();
 $user   = auth_user();
 $active = 'support';
 $title  = 'Support';
+
+/* The project team's account has no learning of its own.
+ *
+ * eduflex54@gmail.com is a shared address, not a participant: it has uploaded
+ * nothing, answered nothing and has no mastery to look at, so every learner
+ * screen would show it an empty state that means nothing. Patrick asked on
+ * 2 November 2026 that it stay out of the learner area entirely.
+ *
+ * Settings is the exception, and has to be: it is where the team changes its
+ * own password, and a role with no way to do that is worse than one that can
+ * see an empty dashboard.
+ *
+ * This runs before any output, so redirect() can still fire. The reverse
+ * direction, a learner reaching an admin page, is held by admin_require() in
+ * the requires slot above. */
+if ($user !== null
+    && admin_is_admin($user)
+    && !str_starts_with($active, 'admin')
+    && $active !== 'settings') {
+    redirect('admin.php');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,6 +64,12 @@ $err      = flash_get('support_error');
 $errors   = flash_get('support_errors') ?: [];
 $draft    = flash_get('support_draft') ?: [];
 $requests = support_list($uid);
+
+/* The experience box below the request list. Its own flash keys, so a failed
+   request and a failed feedback cannot overwrite one another's message. */
+$feedbackOk    = flash_get('feedback_ok');
+$feedbackError = flash_get('feedback_error');
+$feedbackDraft = (string) (flash_get('feedback_draft') ?? '');
 
 $draftType    = (string) ($draft['request_type'] ?? '');
 $draftSubject = (string) ($draft['subject'] ?? '');
@@ -165,6 +192,49 @@ $draftMessage = (string) ($draft['message'] ?? '');
                 <?php endforeach; ?>
               <?php endif; ?>
             </section>
+
+              <?php /* Appendix R 7.5, Provide System Feedback.
+                       Separate from the request form above on purpose. A
+                       request is "something is wrong, please look"; this is
+                       "here is how using EduFlex felt", which is what Chapter V
+                       actually needs. Stored as an ordinary suggestion so it
+                       lands in the team's Manage Feedback screen with
+                       everything else: no second table, no second queue to
+                       forget about. */ ?>
+              <section class="ef-card ef-card-lg">
+                <div class="ef-card-title" style="margin-bottom:6px;">
+                  How has EduFlex been for you?
+                </div>
+                <div class="ef-card-sub" style="margin-bottom:14px;">
+                  Not a problem report. Tell the team what worked, what did not,
+                  and what you would change.
+                </div>
+
+                <?php if ($feedbackOk): ?>
+                  <div class="ef-alert ef-alert-ok"><?= e((string) $feedbackOk) ?></div>
+                <?php endif; ?>
+                <?php if ($feedbackError): ?>
+                  <div class="ef-alert ef-alert-error"><?= e((string) $feedbackError) ?></div>
+                <?php endif; ?>
+
+                <form action="actions/feedback_submit.php" method="post">
+                  <?= csrf_field() ?>
+                  <div class="ef-field">
+                    <label class="ef-label" for="experience">Your experience</label>
+                    <textarea class="ef-input" id="experience"
+                              name="experience" rows="5"
+                              minlength="<?= SUPPORT_MESSAGE_MIN ?>"
+                              maxlength="<?= SUPPORT_MESSAGE_MAX ?>"
+                              placeholder="The practice questions were useful, but..."
+                              required><?= e($feedbackDraft) ?></textarea>
+                    <p class="ef-note">
+                      At least <?= SUPPORT_MESSAGE_MIN ?> characters. Your name is
+                      attached, and only the project team can read it.
+                    </p>
+                  </div>
+                  <button class="ef-btn ef-btn-primary" type="submit">Send feedback</button>
+                </form>
+              </section>
           </div>
 
           <div class="ef-col-fixed-360 ef-stack">
@@ -184,57 +254,20 @@ $draftMessage = (string) ($draft['message'] ?? '');
               <?= legal_contact_block(true) ?>
             </section>
 
-            <!-- Static FAQ. Written out, not generated, and not fake tickets. -->
-            <section class="ef-card ef-card-lg">
-              <div class="ef-card-title" style="margin-bottom:6px;">Common questions</div>
-              <div class="ef-card-sub" style="margin-bottom:16px;">
-                Answered here so you do not have to ask
-              </div>
-
-              <div class="ef-stack" style="gap:16px;">
-                <div>
-                  <div class="ef-list-title">EduFlex cannot read my PDF.</div>
-                  <p class="ef-notif-body">
-                    A scanned page is an image, and there is no text in it to extract.
-                    Open the file and try to select a sentence with your cursor. If you
-                    cannot, EduFlex cannot either.
-                  </p>
+            <?php /* The answers themselves live on app/help.php, Appendix R 7.3.
+                     They used to be repeated here, and two copies of the same
+                     text is two places to update and one place to forget. */ ?>
+              <section class="ef-card ef-card-lg">
+                <div class="ef-card-title" style="margin-bottom:6px;">Before you write</div>
+                <div class="ef-card-sub" style="margin-bottom:14px;">
+                  Most questions are already answered
                 </div>
-                <div>
-                  <div class="ef-list-title">Why does my topic say "No data"?</div>
-                  <p class="ef-notif-body">
-                    A topic needs <?= (int) MASTERY_MIN_ITEMS ?> scored answers before
-                    EduFlex will put a number on it. Fewer than that is not enough
-                    evidence to call a mastery score honest.
-                  </p>
-                </div>
-                <div>
-                  <div class="ef-list-title">A generated question was wrong.</div>
-                  <p class="ef-notif-body">
-                    Report it with the "A generated question or answer was wrong" type
-                    above, and quote the question. EduFlex checks every generated
-                    question against its own material before storing it, but the check
-                    cannot catch everything, and these reports are what the team uses to
-                    improve it.
-                  </p>
-                </div>
-                <div>
-                  <div class="ef-list-title">Does this affect my real grades?</div>
-                  <p class="ef-notif-body">
-                    No. EduFlex is a study aid. Nothing in it is reported to any
-                    instructor and nothing contributes to an official grade.
-                  </p>
-                </div>
-                <div>
-                  <div class="ef-list-title">Can I get my data out, or delete it?</div>
-                  <p class="ef-notif-body">
-                    Yes, both, from Settings, without asking anybody. Export gives you a
-                    JSON file of everything stored about you. Delete removes your
-                    account and all of it permanently.
-                  </p>
-                </div>
-              </div>
-            </section>
+                <p class="ef-second" style="font-size:13px;margin-bottom:14px;">
+                  Why a PDF will not read, what "No data" means, how mastery is
+                  worked out, and why the companion sometimes refuses to answer.
+                </p>
+                <a class="ef-btn ef-btn-ghost" href="help.php">Browse Help and FAQ</a>
+              </section>
 
             <section class="ef-card ef-card-sky">
               <span class="ef-eyebrow">Responsible AI</span>

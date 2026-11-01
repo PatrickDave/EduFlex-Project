@@ -29,6 +29,27 @@ auth_require_login();
 $user   = auth_user();
 $active = 'practice';
 $title  = 'Practice';
+
+/* The project team's account has no learning of its own.
+ *
+ * eduflex54@gmail.com is a shared address, not a participant: it has uploaded
+ * nothing, answered nothing and has no mastery to look at, so every learner
+ * screen would show it an empty state that means nothing. Patrick asked on
+ * 2 November 2026 that it stay out of the learner area entirely.
+ *
+ * Settings is the exception, and has to be: it is where the team changes its
+ * own password, and a role with no way to do that is worse than one that can
+ * see an empty dashboard.
+ *
+ * This runs before any output, so redirect() can still fire. The reverse
+ * direction, a learner reaching an admin page, is held by admin_require() in
+ * the requires slot above. */
+if ($user !== null
+    && admin_is_admin($user)
+    && !str_starts_with($active, 'admin')
+    && $active !== 'settings') {
+    redirect('admin.php');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

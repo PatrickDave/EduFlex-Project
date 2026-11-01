@@ -33,9 +33,42 @@ $nav = [
 ];
 
 $footNav = [
+    ['key' => 'help',     'label' => 'Help and FAQ', 'href' => 'help.php'],
     ['key' => 'support',  'label' => 'Support',  'href' => 'support.php'],
     ['key' => 'settings', 'label' => 'Settings', 'href' => 'settings.php'],
 ];
+
+/* The help desk, for the project team only.
+ *
+ * Hiding a row is a courtesy, not the protection. Every admin page and every
+ * admin endpoint calls admin_require() itself, so a learner who types the URL
+ * is turned away whether or not they ever saw a link. A nav item that is merely
+ * hidden is not a permission.
+ *
+ * admin_is_admin() lives in includes/auth.php, which every page loads, and not
+ * in includes/admin.php, which only the admin pages load. It was in the latter
+ * first and this link appeared nowhere at all.
+ *
+ * THE TWO AREAS DO NOT CROSS. An admin gets the help desk nav and nothing else;
+ * a learner gets the learner nav and never sees a help desk link, not even one
+ * that would be refused. There was a "Learner View" link here and a "Help Desk"
+ * link in the learner footer, and Patrick removed both on 2 November 2026: the
+ * team account is eduflex54@gmail.com, a shared address that is not a
+ * participant and has no learning of its own to look at. */
+$isAdmin   = admin_is_admin($user ?? null);
+$adminArea = $isAdmin && str_starts_with($active, 'admin');
+
+if ($adminArea) {
+    $nav = [
+        ['key' => 'admin',          'label' => 'Admin Dashboard', 'href' => 'admin.php'],
+        ['key' => 'admin_requests', 'label' => 'Manage Requests', 'href' => 'admin_requests.php'],
+        ['key' => 'admin_feedback', 'label' => 'Manage Feedback', 'href' => 'admin_feedback.php'],
+    ];
+    $footNav = [
+        ['key' => 'settings', 'label' => 'Settings', 'href' => 'settings.php'],
+    ];
+}
+
 
 /**
  * One outline icon per nav key.
@@ -84,6 +117,29 @@ function ef_nav_icon(string $key): string
         'settings'  => '<circle cx="8" cy="8" r="2.2"/>'
                      . '<path d="M8 1.7v1.7M8 12.6v1.7M1.7 8h1.7M12.6 8h1.7'
                      . 'M3.5 3.5l1.2 1.2M11.3 11.3l1.2 1.2M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2"/>',
+
+        // A question mark in a circle: help and answers.
+        'help'      => '<circle cx="8" cy="8" r="5.9"/>'
+                     . '<path d="M6.3 6.2a1.75 1.75 0 1 1 2.4 1.62c-.45.2-.7.6-.7 1.08v.3"/>'
+                     . '<path d="M8 11.5h.01"/>',
+
+        // A tray with items stacked in it: the help desk.
+        'admin'     => '<path d="M2.3 9.4h3l.9 1.6h3.6l.9-1.6h3"/>'
+                     . '<path d="M4.1 2.6h7.8l1.8 6.8v2.8a1.2 1.2 0 0 1-1.2 1.2H3.5'
+                     . 'a1.2 1.2 0 0 1-1.2-1.2V9.4Z"/>',
+
+        // An envelope: the requests waiting to be read.
+        'admin_requests' => '<rect x="2" y="3.4" width="12" height="9.2" rx="1.4"/>'
+                          . '<path d="m2.4 4.4 5.6 4 5.6-4"/>',
+
+        // A speech bubble with a tick: feedback that has been looked at.
+        'admin_feedback' => '<path d="M13.6 9.2a1.4 1.4 0 0 1-1.4 1.4H5.4L2.6 13.4V3.6'
+                          . 'a1.4 1.4 0 0 1 1.4-1.4h8.2a1.4 1.4 0 0 1 1.4 1.4Z"/>'
+                          . '<path d="m5.8 6.4 1.6 1.6 3-3"/>',
+
+        // A person: back to what a participant sees.
+        'learner'   => '<circle cx="8" cy="5.4" r="2.6"/>'
+                     . '<path d="M3 13.6a5 5 0 0 1 10 0"/>',
 
         // An arrow leaving through a doorway.
         'signout'   => '<path d="M6.3 13.8H3.9a1.2 1.2 0 0 1-1.2-1.2V3.4a1.2 1.2 0 0 1 1.2-1.2h2.4"/>'
@@ -136,12 +192,18 @@ function ef_nav_item(array $item, string $active): string
        sensibly when there is no recommendation yet, and redirects to Practice
        with a message when there is nothing to practise at all. */
     ?>
+    <?php /* Not in the help desk. Somebody reading the support queue is not
+             looking for a practice set, and a learner call-to-action in an
+             admin sidebar is the clearest sign the two areas were never
+             really separated. */ ?>
+    <?php if (!$adminArea): ?>
     <form method="post" action="actions/practice_next.php" style="margin:0;">
       <?= csrf_field() ?>
       <button class="ef-btn ef-btn-primary ef-btn-block ef-btn-field" type="submit">
         New Practice Session
       </button>
     </form>
+    <?php endif; ?>
     <?php foreach ($footNav as $item) { echo ef_nav_item($item, $active) . "\n    "; } ?>
     <a class="ef-nav-item" href="../auth/logout.php">
       <?= ef_nav_icon('signout') ?><span class="ef-nav-label">Sign out</span>

@@ -40,7 +40,7 @@ $pdo->exec("
 CREATE TABLE user (
   user_id INTEGER PRIMARY KEY AUTOINCREMENT, full_name TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL DEFAULT 'x',
-  avatar_path TEXT NULL);
+  avatar_path TEXT NULL, is_admin INTEGER NOT NULL DEFAULT 0);
 ");
 db_set_connection($pdo);
 

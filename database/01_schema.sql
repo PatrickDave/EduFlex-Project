@@ -35,6 +35,10 @@ CREATE TABLE user (
   -- project root, or NULL when they have not set one. See SCHEMA-NOTES.md 7.
   avatar_path    VARCHAR(255) NULL DEFAULT NULL,
   email_verified_at DATETIME NULL DEFAULT NULL,
+  -- ADDED: 1 for a project team member who may read the support queue. Set by
+  -- hand in phpMyAdmin; nothing in the interface can grant it, so there is no
+  -- path by which a learner could promote themselves. See SCHEMA-NOTES.md 9.
+  is_admin       TINYINT(1)   NOT NULL DEFAULT 0,
   created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
   UNIQUE KEY uq_user_email (email),

@@ -110,6 +110,15 @@ $migrations = [
                       AFTER explanation",
     ],
     [
+        'name'  => 'user.is_admin (the support queue admin view)',
+        'since' => '2026-11-01',
+        'check' => static fn(PDO $pdo): bool =>
+            migrate_column_exists($pdo, 'user', 'is_admin'),
+        'sql'   => "ALTER TABLE user
+                      ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0
+                      AFTER email_verified_at",
+    ],
+    [
         'name'  => 'activity_item.bloom_level (mock examinations)',
         'since' => '2026-09-16',
         'check' => static fn(PDO $pdo): bool =>

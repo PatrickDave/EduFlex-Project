@@ -100,3 +100,22 @@ ALTER TABLE activity_item
 ALTER TABLE activity_item
   ADD COLUMN IF NOT EXISTS bloom_level VARCHAR(20) NULL DEFAULT NULL
   AFTER topic_progress_id;
+
+
+-- ---------------------------------------------------------------------------
+-- 2026-11-01  The support queue, and who may read it.
+--
+-- Module 7 recorded a learner's request and then nobody could see it: the
+-- status column was written as 'open' at creation and no code anywhere changed
+-- it, so "View Request Status" showed "Recorded" forever. The adviser asked for
+-- an admin view at the second consultation.
+--
+-- One flag, set by hand in phpMyAdmin. Nothing in the interface grants it, so
+-- there is no path by which a learner could promote themselves. Default 0 means
+-- every existing account stays a plain learner. See SCHEMA-NOTES.md section 9.
+--
+--     UPDATE user SET is_admin = 1 WHERE email = 'patrickcagas123@gmail.com';
+-- ---------------------------------------------------------------------------
+ALTER TABLE user
+  ADD COLUMN IF NOT EXISTS is_admin TINYINT(1) NOT NULL DEFAULT 0
+  AFTER email_verified_at;

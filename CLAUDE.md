@@ -252,14 +252,17 @@ includes/
                   manuscript, rendered by the landing page
   subscription.php  plans, the free/premium tiers, the Settings plan card
   exams.php       mock examinations: topic choice, assembly, breakdown
-app/              eleven GENERATED pages, plus app/actions/*.php endpoints
+  admin.php       the support queue: who may read it, and moving one along
+app/              sixteen GENERATED pages, plus app/actions/*.php endpoints
 partials/         sidebar.php and topbar.php for the app, public_footer.php
                   for index/login/register/privacy/terms
 database/         01_schema.sql (fresh install, destructive),
                   02_migrations.sql (existing database, safe), SCHEMA-NOTES.md
-tests/            seventeen PHP suites, five Playwright suites
+tests/            eighteen PHP suites, five Playwright suites
 tools/            rubric_run.php (the only script that spends quota),
-                  migrate.php (schema changes without losing data)
+                  migrate.php (schema changes without losing data),
+                  ai_ping.php (prove a key for one request),
+                  make_admin.php (grant or revoke help desk access)
 build_pages.py    regenerates app/*.php from one shell template
 ```
 
@@ -271,13 +274,13 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1182 PHP checks across seventeen suites, all passing, plus 169 browser checks:
+1301 PHP checks across eighteen suites, all passing, plus 169 browser checks:
 
 ```
 auth 73 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 39 | settings 60 | security 79 | avatar 87
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
-verification 92
+verification 92 | admin 119
 runner_browser 54 | chat_browser 29 | video_browser 28 | password_browser 23
 modules_browser 35
 ```
@@ -481,6 +484,144 @@ and no "Manage Subscription", while `manuscript.php` has "Manage subscription"
 and no "View Landing Page". The landing page therefore advertises a sub-module
 the adviser did not approve and omits one he did. The wording differs throughout
 as well, which is cosmetic; that swap is not.
+
+## The support queue (Module 7's missing half)
+
+Built 1 November 2026, after the second consultation scored Module 7 at zero.
+The learner side had worked all along: the module audit found all five
+sub-modules passing. What was missing was anybody on the other end.
+
+**`support_request.status` was written as 'open' at creation and no code
+anywhere changed it.** So "View Request Status" showed "Recorded" forever and a
+submitted request went nowhere visible. The adviser asked for an admin view.
+
+`app/admin.php` lists every request with who sent it, filters by status and by
+type, and moves one along. `admin_set_status()` is the first thing in EduFlex
+that writes to `support_request` after creation, and therefore the first thing
+that makes sub-module 7.2 mean anything.
+
+**This is the one part of EduFlex that deliberately reads across learners.**
+Everywhere else ownership is enforced in SQL by filtering on `user_id`; here the
+whole point is to see other people's requests, so the guard moves from the query
+to the door. Three things hold it:
+
+- **`admin_require()` is called in BOTH `app/admin.php` and
+  `app/actions/admin_status.php`.** A gate on the screen is not a gate on the
+  system: without the second one, anyone signed in could POST and change another
+  learner's request, link or no link. Verified in a browser by POSTing at the
+  endpoint directly as a learner.
+- **It runs in the `{requires}` slot**, which `build_pages.py` emits before any
+  output. A gate after the HTML has started cannot redirect.
+- **`is_admin` is set by hand in phpMyAdmin.** Nothing in the interface grants
+  it: no promote button, no admin registration, no "first user is admin".
+  `tests/admin_test.php` greps `includes/` and `app/actions/` for any statement
+  that writes the column and fails if one appears, comments stripped first.
+
+```
+UPDATE user SET is_admin = 1 WHERE email = 'patrickcagas123@gmail.com';
+```
+
+**Three bugs this flushed out, all found by testing in a browser rather than by
+reading the code:**
+
+1. **`auth_user()` names its columns and `is_admin` was not among them.** The
+   flag was correctly set in the database and `admin_is_admin()` read a key that
+   was never there, so the team was turned away from their own queue. Any future
+   column on `user` is invisible to every caller until it is added to that
+   SELECT.
+2. **`admin_is_admin()` was in `includes/admin.php`, which only `app/admin.php`
+   requires.** On the other eleven pages the function did not exist, so the
+   guarded sidebar call silently skipped and the Support Queue link appeared
+   nowhere. It now lives in `includes/auth.php`, which every page loads.
+3. **The dashboard rendered no flash at all.** `admin_require()` set one before
+   redirecting there and it was swallowed, then surfaced later on whichever page
+   next read `flash_get('error')`. The dashboard now renders it, which also
+   fixes that for every other redirect that lands there.
+
+Adding `is_admin` broke five test suites that build their own SQLite `user`
+table. That is the third time a new column has done this; the fixtures in
+`auth`, `avatar`, `security`, `settings` and `verification` all need it.
+
+**Worth knowing before the third consultation:** the queue on Patrick's install
+is empty, and an empty queue demonstrates nothing. The adviser's note was
+"prepare data so that we can see the actual". Submit two or three requests as a
+learner first, then show the round trip: submit, see it in the queue, move it to
+Being looked at, and watch the learner's own Support page and notifications
+change. That round trip is proven end to end in a browser.
+
+## Two doors, and what is behind each
+
+Settled 2 November 2026 after three rounds. Patrick wanted a separate admin
+sign-in; I argued twice for one login with role routing and was overruled, which
+was his call to make. What got built is the version he asked for.
+
+**`login.php` and `admin_login.php` are separate pages**, each carrying the same
+User / Admin switch from `partials/auth_tabs.php`. The tabs are plain links to
+the other page, so the control works with no JavaScript and the address bar
+always says which door you are at.
+
+Each door refuses the other's people:
+
+- A learner with the **correct password** at the team door is refused and signed
+  back out. The message is identical to a wrong password, so the page cannot be
+  used to discover which addresses are admins.
+- A team account at the learner door is signed out and sent to
+  `admin_login.php?team=1`.
+
+**A query flag, not a flash.** `auth_logout()` destroys the session on the way
+across, so a flash set before it dies with the session and one set after it has
+no session to live in. The message was written and silently lost until this
+changed. Account deletion already solved the same problem the same way.
+
+**What is NOT duplicated is the machinery.** `auth_login()` is still the only
+place a password is checked, so there is one password rule, one login throttle
+and one email-verification path. A second copy of any of those would be a second
+thing to keep correct.
+
+**The two areas do not cross.** A learner never sees a help desk link, not even
+one that would be refused; a team account gets the help desk nav and nothing
+else. There was a "Learner View" link and a "Help Desk" link, and both were
+removed: the team account is a shared address with no learning of its own.
+
+**`eduflex54@gmail.com` is the only admin**, set 2 November 2026.
+`patrickcagas123@gmail.com` was revoked at the same time and is now a plain
+learner account, with its 2 materials, 29 topics and 5 attempts untouched: the
+flag was removed, nothing else.
+
+**The team account cannot reach the learner area either.** The guard is in
+`build_pages.py`'s SHELL, so it covers all sixteen generated pages at once and
+a new page cannot be added without it. Settings is the one exception, because
+that is where the team changes its own password. It reads `admin_is_admin()`,
+never a hard-coded address.
+
+Grant and revoke with:
+
+```
+php tools/make_admin.php eduflex54@gmail.com
+php tools/make_admin.php <email> --revoke
+php tools/make_admin.php                     # who has it now
+```
+
+Register the account through the normal Sign Up form **in the browser the team
+will use**. That gives the browser a seven-day trust grant, so the first
+sign-in does not need a code emailed to the team inbox. Creating the row from
+the command line skips that grant.
+
+## Help and FAQ (Appendix R 7.3)
+
+`app/help.php`, in the learner nav. Nine answers in `<details>` elements:
+keyboard-operable, findable by the browser's own search, and working with no
+JavaScript.
+
+Every answer is written out. **Nothing on this page costs a provider call**, so
+it reads the same every time including in a room with no wifi, and
+`tests/admin_test.php` asserts it never calls `ai_provider()`, `chat_ask()` or
+`questions_generate()`. The answers that quote numbers read `MASTERY_MIN_ITEMS`
+and the band constants rather than hard-coding them.
+
+These answers used to be a card at the bottom of `app/support.php`. They are
+not any more: Support links here instead. **One copy, asserted.** Two copies of
+the same text is two places to update and one place to forget.
 
 ## Still to do
 

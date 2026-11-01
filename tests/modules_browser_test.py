@@ -276,12 +276,24 @@ with sync_playwright() as p:
               "%s.php renders %d chars, no PHP errors" % (slug, len(body.strip())))
 
     # ------------------------------------------------ Module 7
+    # 7.3 moved to its own page on 2 November 2026. The answers used to be a
+    # card at the bottom of Support, where a learner looking for an answer had
+    # to scroll past a form meant for reporting problems.
+    page.goto(BASE + "/app/help.php", wait_until="load")
+    page.wait_for_timeout(700)
+    help_text = text()
+    check(7, M7, 3, "Browse Help and FAQ",
+          "Common questions" in help_text
+          and page.locator("details.ef-help-item").count() >= 5,
+          "help.php renders %d collapsible answers"
+          % page.locator("details.ef-help-item").count())
+
     page.goto(BASE + "/app/support.php", wait_until="load")
     page.wait_for_timeout(700)
     support_html = page.content().lower()
-    check(7, M7, 3, "Browse Help and FAQ",
-          "common questions" in text().lower(),
-          "static FAQ section renders")
+    check(7, M7, "+", "Support points at Help rather than repeating it",
+          page.locator("a[href='help.php']").count() >= 1,
+          "one copy of the FAQ, linked from Support")
     check(7, M7, 4, "Report Incorrect AI Output",
           "ai_quality" in support_html or "was wrong" in support_html,
           "request type for a wrong generated question or answer")

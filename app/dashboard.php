@@ -15,6 +15,27 @@ auth_require_login();
 $user   = auth_user();
 $active = 'dashboard';
 $title  = 'Dashboard';
+
+/* The project team's account has no learning of its own.
+ *
+ * eduflex54@gmail.com is a shared address, not a participant: it has uploaded
+ * nothing, answered nothing and has no mastery to look at, so every learner
+ * screen would show it an empty state that means nothing. Patrick asked on
+ * 2 November 2026 that it stay out of the learner area entirely.
+ *
+ * Settings is the exception, and has to be: it is where the team changes its
+ * own password, and a role with no way to do that is worse than one that can
+ * see an empty dashboard.
+ *
+ * This runs before any output, so redirect() can still fire. The reverse
+ * direction, a learner reaching an admin page, is held by admin_require() in
+ * the requires slot above. */
+if ($user !== null
+    && admin_is_admin($user)
+    && !str_starts_with($active, 'admin')
+    && $active !== 'settings') {
+    redirect('admin.php');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -36,6 +57,11 @@ $title  = 'Dashboard';
 <?php include __DIR__ . '/../partials/topbar.php'; ?>
 
 <?php
+/* The dashboard is where redirects land when something is refused elsewhere,
+   so it has to be able to say why. Until 1 November 2026 it rendered no flash
+   at all: admin_require() set one and it was swallowed here, then surfaced
+   later on whichever page next happened to read flash_get('error'). */
+$flashError = flash_get('error');
 $uid    = (int) $user['user_id'];
 $stage  = stats_stage($uid);
 $empty  = stats_empty_state($stage, 'progress');
@@ -46,6 +72,10 @@ $weekTotal = array_sum(array_column($week, 'value'));
 $weekMax   = max(1, max(array_column($week, 'value')));
 ?>
       <div class="ef-content">
+
+        <?php if ($flashError): ?>
+          <div class="ef-alert ef-alert-error"><?= e((string) $flashError) ?></div>
+        <?php endif; ?>
 
         <div class="ef-page-head">
           <div>
