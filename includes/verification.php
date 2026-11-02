@@ -213,9 +213,13 @@ function verification_finish(string $code, bool $trust): array
         unset($_SESSION['_email_pending']);
         if ($token !== null) {
             trusted_browser_cookie($token, time() + TRUSTED_BROWSER_SECONDS);
-        } elseif ($purpose === 'login') {
-            trusted_browser_cookie('', time() - 3600);
         }
+        /* Declining to trust this browser deliberately does NOT clear the
+         * cookie. The row for THIS account was already deleted above, which is
+         * what "do not trust me" means. Clearing the cookie would throw away
+         * the browser token itself, and with it every OTHER account's trust on
+         * this machine: the same one-cookie-many-accounts bug that
+         * trusted_browser_store() carried. */
         if ($purpose === 'login') {
             auth_complete_login($user);
         }
@@ -276,14 +280,33 @@ function trusted_browser_cookie(string $value, int $expires): void
 
 function trusted_browser_store(array $user, bool $registrationPending = false): string
 {
-    $token = bin2hex(random_bytes(32));
+    /* The token identifies the BROWSER, not the account, so it is reused when
+     * this browser already has one.
+     *
+     * It used to mint a fresh token every time and overwrite the cookie with
+     * it. There is only one cookie, so trusting a second account evicted the
+     * first: its row stayed in the table but the browser no longer held its
+     * token, and the next sign-in as that account demanded a code again. Trust
+     * one, lose the other, forever, alternating.
+     *
+     * Patrick hit this on 2 November 2026, switching between his learner
+     * account and eduflex54@gmail.com in the same browser. Reproduced with two
+     * accounts in one cookie jar: the first was challenged on every single
+     * login while the second never was. His table had four unreachable rows
+     * for one account and three for the other.
+     *
+     * Rows are keyed on (token_hash, user_id), so one browser token can carry
+     * a row per account without them colliding. */
+    $existing = $_COOKIE[TRUSTED_BROWSER_COOKIE] ?? '';
+    $token = (is_string($existing) && preg_match('/^[a-f0-9]{64}$/D', $existing))
+        ? $existing
+        : bin2hex(random_bytes(32));
+
     db()->prepare('DELETE FROM trusted_browser WHERE user_id = ? AND expires_at <= ?')->execute([$user['user_id'], time()]);
-    // Replace this browser's previous credential; other browsers stay trusted.
-    $previous = $_COOKIE[TRUSTED_BROWSER_COOKIE] ?? '';
-    if (is_string($previous)) {
-        db()->prepare('DELETE FROM trusted_browser WHERE token_hash = ? AND user_id = ?')
-            ->execute([hash('sha256', $previous), $user['user_id']]);
-    }
+    // Replace only THIS account's row for THIS browser. Other accounts trusted
+    // on the same browser keep theirs, and other browsers are untouched.
+    db()->prepare('DELETE FROM trusted_browser WHERE token_hash = ? AND user_id = ?')
+        ->execute([hash('sha256', $token), $user['user_id']]);
     db()->prepare('INSERT INTO trusted_browser (user_id, token_hash, credential_hash, created_at, expires_at, registration_pending) VALUES (?, ?, ?, ?, ?, ?)')
         ->execute([$user['user_id'], hash('sha256', $token), verification_credential($user), time(), time() + TRUSTED_BROWSER_SECONDS, $registrationPending ? 1 : 0]);
     return $token;

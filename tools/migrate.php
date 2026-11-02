@@ -110,6 +110,15 @@ $migrations = [
                       AFTER explanation",
     ],
     [
+        'name'  => 'trusted_browser key covers (token, user)',
+        'since' => '2026-11-02',
+        'check' => static fn(PDO $pdo): bool =>
+            migrate_pk_has_column($pdo, 'trusted_browser', 'user_id'),
+        'sql'   => "ALTER TABLE trusted_browser
+                      DROP PRIMARY KEY,
+                      ADD PRIMARY KEY (token_hash, user_id)",
+    ],
+    [
         'name'  => 'user.is_admin (the support queue admin view)',
         'since' => '2026-11-01',
         'check' => static fn(PDO $pdo): bool =>
@@ -140,6 +149,24 @@ function migrate_table_exists(PDO $pdo, string $table): bool
           WHERE table_schema = DATABASE() AND table_name = ?'
     );
     $stmt->execute([$table]);
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+/**
+ * Is $column part of $table's PRIMARY KEY?
+ *
+ * The existing checks ask whether a column exists. This one asks about the key
+ * itself, because the 2026-11-02 change adds no column: it widens the primary
+ * key of trusted_browser from (token_hash) to (token_hash, user_id).
+ */
+function migrate_pk_has_column(PDO $pdo, string $table, string $column): bool
+{
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.key_column_usage
+          WHERE table_schema = DATABASE() AND table_name = ?
+            AND constraint_name = 'PRIMARY' AND column_name = ?"
+    );
+    $stmt->execute([$table, $column]);
     return (int) $stmt->fetchColumn() > 0;
 }
 

@@ -119,3 +119,24 @@ ALTER TABLE activity_item
 ALTER TABLE user
   ADD COLUMN IF NOT EXISTS is_admin TINYINT(1) NOT NULL DEFAULT 0
   AFTER email_verified_at;
+
+
+-- ---------------------------------------------------------------------------
+-- 2026-11-02  One browser, more than one account.
+--
+-- trusted_browser was keyed on token_hash alone, so a browser token could
+-- belong to exactly one account. The cookie holds one token, so trusting a
+-- second account minted a new token and overwrote the cookie: the first
+-- account's row stayed in the table but the browser no longer held its token,
+-- and every later sign-in as that account demanded a code again.
+--
+-- Patrick hit this switching between his learner account and
+-- eduflex54@gmail.com in the same browser. Reproduced with two accounts in one
+-- cookie jar: the first was challenged on every login, the second never.
+--
+-- Keying on (token_hash, user_id) lets one browser carry a row per account.
+-- Nothing is dropped and no row is lost; only the key changes.
+-- ---------------------------------------------------------------------------
+ALTER TABLE trusted_browser
+  DROP PRIMARY KEY,
+  ADD PRIMARY KEY (token_hash, user_id);

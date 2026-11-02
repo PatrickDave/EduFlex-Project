@@ -24,8 +24,9 @@ $pdo->exec("CREATE TABLE user (user_id INTEGER PRIMARY KEY AUTOINCREMENT, full_n
  CREATE TABLE email_verification (user_id INTEGER PRIMARY KEY REFERENCES user(user_id) ON DELETE CASCADE,
  challenge_id TEXT, binding_hash TEXT, code_hash TEXT, credential_hash TEXT, expires_at INTEGER, attempts INTEGER,
  last_sent_at INTEGER, send_window_start INTEGER, sends_in_window INTEGER, blocked_until INTEGER, consumed INTEGER);
- CREATE TABLE trusted_browser (token_hash TEXT PRIMARY KEY, user_id INTEGER REFERENCES user(user_id) ON DELETE CASCADE,
- credential_hash TEXT, created_at INTEGER, expires_at INTEGER, registration_pending INTEGER DEFAULT 0);");
+ CREATE TABLE trusted_browser (token_hash TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES user(user_id) ON DELETE CASCADE,
+ credential_hash TEXT, created_at INTEGER, expires_at INTEGER, registration_pending INTEGER DEFAULT 0,
+ PRIMARY KEY (token_hash, user_id));");
 $GLOBALS['eduflex_test_mail_config'] = ['enabled' => true];
 $outbox = []; $deliver = true; $passed = 0; $failed = 0;
 $GLOBALS['eduflex_test_mail_sender'] = static function ($email, $code) use (&$outbox, &$deliver): bool {
@@ -215,4 +216,90 @@ $stmt = $pdo->prepare('SELECT registration_pending FROM trusted_browser WHERE to
 $stmt->execute([hash('sha256', $_COOKIE[TRUSTED_BROWSER_COOKIE])]);
 check('renewed trust is not another registration exception', (int) $stmt->fetchColumn() === 0);
 $pdo->prepare('DELETE FROM user WHERE user_id = ?')->execute([$deferredId]);
+
+/* ------------------------------------------- one browser, two accounts */
+
+echo "
+-- one browser, two accounts --
+";
+
+/* 2 November 2026. Patrick reported that verification appeared on every login
+   even after ticking "trust this browser for 7 days".
+   
+   trusted_browser was keyed on token_hash ALONE, and the cookie holds one
+   token. Trusting a second account minted a new token and overwrote the
+   cookie: the first account's row stayed in the table but the browser no
+   longer held its token, so every later sign-in as that account asked for a
+   code again. Trust one, lose the other, alternating forever.
+   
+   Reproduced with two accounts in one cookie jar: the first was challenged on
+   every single login, the second never. His table had four unreachable rows
+   for one account and three for another.
+   
+   The fix is in two halves and BOTH are needed: the key widened to
+   (token_hash, user_id), and trusted_browser_store() reuses this browser's
+   existing token instead of minting a new one. */
+
+/* Both created here. The checks above delete users as part of testing
+   withdrawal, so whatever is left in the table by this point is not something
+   to build on. */
+$pdo->exec("INSERT INTO user (full_name, email, password_hash, account_status)
+            VALUES ('First Person', 'first-browser@example.com', 'x', 'active')");
+$alice = (int) $pdo->lastInsertId();
+$pdo->exec("INSERT INTO user (full_name, email, password_hash, account_status)
+            VALUES ('Second Person', 'second-browser@example.com', 'x', 'active')");
+$bob = (int) $pdo->lastInsertId();
+
+$_COOKIE = [];
+$tokenA = trusted_browser_store(verification_user($alice));
+$_COOKIE[TRUSTED_BROWSER_COOKIE] = $tokenA;
+
+check('the first account is trusted',
+    trusted_browser_matches(verification_user($alice)));
+
+$tokenB = trusted_browser_store(verification_user($bob));
+
+check('the second account reuses the same browser token', $tokenA === $tokenB);
+
+$_COOKIE[TRUSTED_BROWSER_COOKIE] = $tokenB;
+
+check('the second account is now trusted',
+    trusted_browser_matches(verification_user($bob)));
+
+check('and the FIRST is still trusted, which is the whole bug',
+    trusted_browser_matches(verification_user($alice)));
+
+check('both rows exist against one token', (function () use ($pdo, $tokenA) {
+    $n = (int) $pdo->query("SELECT COUNT(*) FROM trusted_browser WHERE token_hash = '"
+        . hash('sha256', $tokenA) . "'")->fetchColumn();
+    return $n === 2;
+})());
+
+check('the key allows it, so the row could be stored at all', (function () use ($pdo) {
+    // Keyed on token_hash alone, the second INSERT fails and registration
+    // reports "Could not create the account."
+    $sql = (string) file_get_contents(__DIR__ . '/../database/01_schema.sql');
+    return (bool) preg_match('/PRIMARY KEY \(token_hash, user_id\)/', $sql);
+})());
+
+check('a browser with no cookie still gets a fresh token', (function () use ($alice) {
+    $_COOKIE = [];
+    $fresh = trusted_browser_store(verification_user($alice));
+    return (bool) preg_match('/^[a-f0-9]{64}$/D', $fresh);
+})());
+
+check('a junk cookie is not reused as a token', (function () use ($bob) {
+    $_COOKIE[TRUSTED_BROWSER_COOKIE] = 'not-a-token';
+    $fresh = trusted_browser_store(verification_user($bob));
+    return $fresh !== 'not-a-token'
+        && (bool) preg_match('/^[a-f0-9]{64}$/D', $fresh);
+})());
+
+check('declining to trust does not wipe the browser token', (function () {
+    // The other half of the same bug: clearing the cookie on "do not trust me"
+    // threw away the token and with it every OTHER account's trust here.
+    $src = php_strip_whitespace(__DIR__ . '/../includes/verification.php');
+    return !str_contains($src, "trusted_browser_cookie('', time() - 3600)");
+})());
+
 echo "\nPassed: $passed   Failed: $failed\n"; ob_end_flush(); exit($failed ? 1 : 0);

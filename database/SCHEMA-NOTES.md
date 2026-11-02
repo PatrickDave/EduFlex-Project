@@ -231,3 +231,27 @@ a plain learner.
 
 Write this into the Chapter III data dictionary before the defense, along with
 the other eight.
+
+## 10. `trusted_browser` PRIMARY KEY `(token_hash, user_id)`
+
+Changed 2 November 2026. It was `(token_hash)` alone.
+
+The cookie holds one token, and that token identifies the BROWSER. Keyed on the
+token alone, a browser could be trusted for exactly one account: trusting a
+second minted a new token and overwrote the cookie, so the first account's row
+stayed in the table while the browser no longer held its token. Every later
+sign-in as that account asked for an emailed code again.
+
+Patrick hit this switching between his learner account and the team account
+`eduflex54@gmail.com` in the same browser. Reproduced with two accounts in one
+cookie jar: the first was challenged on every single login, the second never.
+His table held four unreachable rows for one account and three for another.
+
+Widening the key lets one browser carry a row per account. No column was added
+and no row was lost; `tools/migrate.php` applies it with
+`DROP PRIMARY KEY, ADD PRIMARY KEY (token_hash, user_id)`.
+
+`trusted_browser_store()` changed with it: it now reuses this browser's existing
+token rather than minting a new one. **Both halves are needed.** The key alone
+still leaves the cookie being overwritten; the reuse alone cannot store the
+second row, and registration fails with "Could not create the account."

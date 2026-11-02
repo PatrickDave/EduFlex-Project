@@ -402,7 +402,12 @@ CREATE TABLE trusted_browser (
   created_at BIGINT NOT NULL,
   expires_at BIGINT NOT NULL,
   registration_pending TINYINT NOT NULL DEFAULT 0,
-  PRIMARY KEY (token_hash),
+  -- (token_hash, user_id), NOT token_hash alone. The token identifies the
+  -- BROWSER; one browser can hold trust for more than one account, which is
+  -- ordinary when a project team member also has a learner account. Keyed on
+  -- the token alone, trusting a second account could not store a row at all.
+  -- See SCHEMA-NOTES.md 10.
+  PRIMARY KEY (token_hash, user_id),
   KEY idx_trust_user_expiry (user_id, expires_at),
   CONSTRAINT fk_trust_user FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
