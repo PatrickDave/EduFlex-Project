@@ -65,7 +65,7 @@ if ($adminArea) {
         ['key' => 'admin_feedback', 'label' => 'Manage Feedback', 'href' => 'admin_feedback.php'],
     ];
     $footNav = [
-        ['key' => 'settings', 'label' => 'Settings', 'href' => 'settings.php'],
+        ['key' => 'admin_settings', 'label' => 'Settings', 'href' => 'admin_settings.php'],
     ];
 }
 
@@ -114,6 +114,12 @@ function ef_nav_icon(string $key): string
                      . '<path d="M8 11.7h.01"/>',
 
         // A gear, minus the teeth that vanish at this size.
+        // Same cog as the learner Settings: the same idea, and a second
+        // drawing for it would only read as a mistake.
+        'admin_settings' => '<circle cx="8" cy="8" r="2.2"/>'
+                     . '<path d="M8 1.7v1.7M8 12.6v1.7M1.7 8h1.7M12.6 8h1.7'
+                     . 'M3.5 3.5l1.2 1.2M11.3 11.3l1.2 1.2M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2"/>',
+
         'settings'  => '<circle cx="8" cy="8" r="2.2"/>'
                      . '<path d="M8 1.7v1.7M8 12.6v1.7M1.7 8h1.7M12.6 8h1.7'
                      . 'M3.5 3.5l1.2 1.2M11.3 11.3l1.2 1.2M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2"/>',

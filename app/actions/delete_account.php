@@ -18,7 +18,7 @@ $user = auth_user();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check($_POST['_csrf'] ?? null)) {
     flash_set('delete_error', 'Your session expired. Please try again.');
-    redirect('../settings.php');
+    redirect('../' . auth_settings_page(auth_user()));
 }
 
 $result = auth_delete_account(
@@ -28,7 +28,7 @@ $result = auth_delete_account(
 
 if (!$result['ok']) {
     flash_set('delete_error', (string) $result['error']);
-    redirect('../settings.php');
+    redirect('../' . auth_settings_page(auth_user()));
 }
 
 // The account is gone, so the session points at a user who no longer exists.

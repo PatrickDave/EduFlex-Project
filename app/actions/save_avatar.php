@@ -16,7 +16,7 @@ $user = auth_user();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check($_POST['_csrf'] ?? null)) {
     flash_set('avatar_error', 'Your session expired. Please try again.');
-    redirect('../settings.php');
+    redirect('../' . auth_settings_page(auth_user()));
 }
 
 $result = avatar_store((int) $user['user_id'], $_FILES['avatar'] ?? []);
@@ -27,4 +27,4 @@ if ($result['ok']) {
     flash_set('avatar_error', (string) $result['error']);
 }
 
-redirect('../settings.php');
+redirect('../' . auth_settings_page(auth_user()));

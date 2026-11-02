@@ -423,6 +423,67 @@ p { margin: 0; }
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- Users, on app/admin_settings.php ----
+
+   Collapsed by default. A list of participants with their counts is the kind
+   of thing that should take a deliberate click to open, not sit expanded on a
+   screen somebody might have on a projector.
+   ---------------------------------------------------------------------- */
+
+/* .ef-label is a space-between flex, because it carries things like
+   "Password" on the left and "Cannot sign in?" on the right. A label whose
+   text is one sentence containing an email address should not be pulled apart
+   across the row like that. The learner Settings page has the same oddity on
+   its own delete confirmation; this does not change it, only these. */
+.ef-label-plain {
+  display: block;
+  line-height: 1.6;
+}
+
+.ef-admin-users { display: flex; flex-direction: column; }
+
+.ef-admin-user { border-bottom: 1px solid var(--ef-border); }
+.ef-admin-user:last-child { border-bottom: 0; }
+
+.ef-admin-user summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 2px;
+  cursor: pointer;
+  list-style: none;
+}
+.ef-admin-user summary::-webkit-details-marker { display: none; }
+.ef-admin-user summary::marker { content: ''; }
+.ef-admin-user summary:focus-visible {
+  outline: 2px solid var(--ef-primary-bright);
+  outline-offset: 2px;
+  border-radius: var(--ef-r-sm);
+}
+
+.ef-admin-user-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ef-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Materials, Topics, Attempts. Short because the row has to survive a narrow
+   screen without wrapping into something unreadable. */
+.ef-admin-user-counts {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ef-text-muted);
+}
+
+.ef-admin-user-body {
+  padding: 4px 2px 20px;
+  border-top: 1px dashed var(--ef-border);
+  margin-top: 2px;
+}
+
 .ef-admin-filters {
   display: flex;
   flex-wrap: wrap;

@@ -554,6 +554,26 @@ function admin_is_admin(?array $user): bool
 }
 
 /**
+ * Which settings page this user's own account lives on.
+ *
+ * app/settings.php and app/admin_settings.php both post to the same endpoints
+ * for the things both roles do: change password, upload an avatar, delete the
+ * account. Those endpoints have to send each role back where it came from.
+ *
+ * Without this they all redirected to settings.php, and for an admin the SHELL
+ * guard then bounced that to the help desk, where nothing reads
+ * flash_get('password_ok'). The password really did change and the screen said
+ * nothing, which is the same silent-message bug as the one across the two
+ * sign-in doors.
+ *
+ * Returns a bare filename; the caller adds its own '../'.
+ */
+function auth_settings_page(?array $user): string
+{
+    return admin_is_admin($user) ? 'admin_settings.php' : 'settings.php';
+}
+
+/**
  * Where this user belongs after signing in.
  *
  * One login form, no ADMIN/LEARNER tabs. A second login would mean a second

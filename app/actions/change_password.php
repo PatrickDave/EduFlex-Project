@@ -16,7 +16,7 @@ $user = auth_user();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check($_POST['_csrf'] ?? null)) {
     flash_set('password_error', 'Your session expired. Please try again.');
-    redirect('../settings.php');
+    redirect('../' . auth_settings_page(auth_user()));
 }
 
 $result = auth_change_password(
@@ -34,4 +34,4 @@ if ($result['ok']) {
     flash_set('password_error', (string) reset($result['errors']));
 }
 
-redirect('../settings.php');
+redirect('../' . auth_settings_page(auth_user()));

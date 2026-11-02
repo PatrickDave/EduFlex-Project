@@ -17,7 +17,7 @@ $user = auth_user();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check($_POST['_csrf'] ?? null)) {
     flash_set('avatar_error', 'Your session expired. Please try again.');
-    redirect('../settings.php');
+    redirect('../' . auth_settings_page(auth_user()));
 }
 
 if (avatar_remove((int) $user['user_id'])) {
@@ -26,4 +26,4 @@ if (avatar_remove((int) $user['user_id'])) {
     flash_set('avatar_error', 'There was no profile picture to remove.');
 }
 
-redirect('../settings.php');
+redirect('../' . auth_settings_page(auth_user()));

@@ -42,13 +42,23 @@ CREATE TABLE user (
   full_name TEXT NOT NULL, email TEXT NOT NULL,
   password_hash TEXT NOT NULL DEFAULT 'x',
   account_status TEXT NOT NULL DEFAULT 'active',
-  is_admin INTEGER NOT NULL DEFAULT 0);
+  is_admin INTEGER NOT NULL DEFAULT 0,
+  email_verified_at TEXT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE support_request (
   request_id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL, request_type TEXT NOT NULL,
   subject TEXT NOT NULL, message TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open',
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE learning_resource (
+  resource_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+  title TEXT NOT NULL DEFAULT '');
+CREATE TABLE topic_progress (
+  topic_progress_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+  topic_name TEXT NOT NULL DEFAULT '');
+CREATE TABLE activity_attempt (
+  attempt_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL);
 CREATE TABLE notification (
   notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL, notification_type TEXT NOT NULL,
@@ -583,17 +593,29 @@ check('every generated learner page carries it', (function () {
     return true;
 })());
 
-check('Settings is the one exception, and deliberately so', (function () use ($build) {
-    // It is where the team changes its own password. A role with no way to do
-    // that is worse than one that can see an empty dashboard.
-    return str_contains($build, "\$active !== 'settings'");
+check('there is no exception left, not even for Settings', (function () use ($build) {
+    // There was one, because app/settings.php was the only place the team
+    // could change its own password. app/admin_settings.php does that now, so
+    // the separation is complete: no learner page at all.
+    return !str_contains($build, "\$active !== 'settings'");
 })());
 
-check('the admin nav offers Settings, so the exception is reachable', (function () {
+check('the admin nav points at its own Settings, not the learner one', (function () {
     $sidebar = (string) file_get_contents(__DIR__ . '/../partials/sidebar.php');
     $at = strpos($sidebar, 'if ($adminArea) {');
-    return $at !== false && str_contains(substr($sidebar, $at, 700), "'href' => 'settings.php'");
+    $block = substr($sidebar, (int) $at, 700);
+    return str_contains($block, "'href' => 'admin_settings.php'")
+        && !str_contains($block, "'href' => 'settings.php'");
 })());
+
+check('the learner Settings page is now refused like any other learner page',
+    (function () {
+        // $active is 'settings', which does not start with 'admin', so the
+        // guard fires. Before admin_settings.php existed it was excepted.
+        $page = (string) file_get_contents(__DIR__ . '/../app/settings.php');
+        return str_contains($page, "redirect('admin.php')")
+            && str_contains($page, "\$active = 'settings'");
+    })());
 
 check('the guard reads the flag, not a hard-coded address', (function () use ($build) {
     // The team address can change; the flag is the rule. Checked against the
@@ -666,6 +688,132 @@ check('Support points here instead of repeating the answers', (function () use (
 check('so there is exactly one copy of the FAQ', (function () use ($help, $support2) {
     return substr_count($help, 'Common questions') === 1
         && substr_count($support2, 'Common questions') === 0;
+})());
+
+section('The team has its own Settings');
+
+/* 2 November 2026. Clicking Settings as an admin landed on app/settings.php,
+   a learner screen with Personal details, a plan card and an export of "your"
+   learning, none of which a shared team address has. Worse, $active was
+   'settings', so the sidebar rendered the LEARNER nav and the help desk
+   vanished mid-session. That is the inconsistency Patrick reported. */
+
+$adminSettings = (string) file_get_contents(__DIR__ . '/../app/admin_settings.php');
+
+check('there is a team settings page', is_file(__DIR__ . '/../app/admin_settings.php'));
+
+check('it is an admin page, so the sidebar stays the help desk nav',
+    str_contains($adminSettings, "\$active = 'admin_settings'"));
+
+check('and it is gated like every other admin page',
+    str_contains($adminSettings, 'admin_require()'));
+
+check('profile picture stayed', str_contains($adminSettings, 'Profile picture'));
+check('change password stayed',  str_contains($adminSettings, 'Change password'));
+check('delete my account stayed', str_contains($adminSettings, 'Delete my account'));
+
+check('personal details went', (function () use ($adminSettings) {
+    // The page's own comment names what was removed, so reading the raw file
+    // finds that sentence and reports the opposite of the truth. Same trap as
+    // the is_admin scan further down.
+    return !str_contains(php_strip_whitespace(__DIR__ . '/../app/admin_settings.php'),
+                         'Personal details');
+})());
+
+check('"Your data" became Users', (function () use ($adminSettings) {
+    return !str_contains($adminSettings, 'Your data')
+        && str_contains($adminSettings, '>Users<');
+})());
+
+check('the learner plan card is not on it',
+    !str_contains($adminSettings, 'Your plan'));
+
+section('Users: acting on a participant');
+
+check('admin_users() lists learners', count(admin_users()) >= 1);
+
+check('and never a team account', (function () {
+    foreach (admin_users() as $u) {
+        $row = db()->query('SELECT is_admin FROM user WHERE user_id = '
+                           . (int) $u['user_id'])->fetch();
+        if ($row !== false && (int) $row['is_admin'] === 1) { return false; }
+    }
+    return true;
+})());
+
+check('admin_user() refuses a team account', (function () {
+    // Otherwise a crafted id could export or delete another admin through a
+    // screen meant for participants.
+    $adminId = (int) db()->query('SELECT user_id FROM user WHERE is_admin = 1 LIMIT 1')
+                        ->fetchColumn();
+    return $adminId > 0 && admin_user($adminId) === null;
+})());
+
+check('and a learner that does not exist', admin_user(999999) === null);
+
+$exportEndpoint = (string) file_get_contents(__DIR__ . '/../app/actions/admin_user_export.php');
+$deleteEndpoint = (string) file_get_contents(__DIR__ . '/../app/actions/admin_user_delete.php');
+
+check('both endpoints are gated', (function () use ($exportEndpoint, $deleteEndpoint) {
+    return str_contains($exportEndpoint, 'admin_require()')
+        && str_contains($deleteEndpoint, 'admin_require()');
+})());
+
+check('both check CSRF and the method', (function () use ($exportEndpoint, $deleteEndpoint) {
+    foreach ([$exportEndpoint, $deleteEndpoint] as $src) {
+        if (!str_contains($src, 'csrf_check(')) { return false; }
+        if (!str_contains($src, "REQUEST_METHOD'] !== 'POST'")) { return false; }
+    }
+    return true;
+})());
+
+check('both resolve the target through admin_user(), not a raw id',
+    (function () use ($exportEndpoint, $deleteEndpoint) {
+        return str_contains($exportEndpoint, 'admin_user(')
+            && str_contains($deleteEndpoint, 'admin_user(');
+    })());
+
+check('deleting still needs the address typed', (function () use ($deleteEndpoint) {
+    // auth_delete_account() refuses unless it matches. That check was written
+    // for a learner deleting themselves and is worth more here, where the
+    // person typing is not the person being deleted.
+    return str_contains($deleteEndpoint, 'confirm_email')
+        && str_contains($deleteEndpoint, 'auth_delete_account(');
+})());
+
+check('and the mismatch message does not say "your own email"', (function () use ($deleteEndpoint) {
+    // auth_delete_account() says exactly that, which is right for the learner
+    // page and wrong here: the address belongs to somebody else.
+    return str_contains($deleteEndpoint, 'your own email')
+        && str_contains($deleteEndpoint, 'Type %s exactly');
+})());
+
+check('export reuses auth_export_data(), not a second query',
+    str_contains($exportEndpoint, 'auth_export_data('));
+
+section('Shared endpoints send each role back where it came from');
+
+check('there is one place that decides which settings page is whose',
+    function_exists('auth_settings_page'));
+
+check('it routes an admin to the team page',
+    auth_settings_page(['is_admin' => 1]) === 'admin_settings.php');
+
+check('and a learner to their own',
+    auth_settings_page(['is_admin' => 0]) === 'settings.php');
+
+check('the four shared endpoints use it', (function () {
+    // change_password, save_avatar, delete_avatar and delete_account are
+    // posted to by BOTH settings pages. They all redirected to settings.php,
+    // and for an admin the SHELL guard then bounced that to the help desk,
+    // where nothing reads flash_get('password_ok'). The password really did
+    // change and the screen said nothing.
+    foreach (['change_password', 'save_avatar', 'delete_avatar', 'delete_account'] as $f) {
+        $src = (string) file_get_contents(__DIR__ . '/../app/actions/' . $f . '.php');
+        if (!str_contains($src, 'auth_settings_page(')) { return false; }
+        if (str_contains($src, "redirect('../settings.php')")) { return false; }
+    }
+    return true;
 })());
 
 section('Granting team access');

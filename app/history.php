@@ -23,17 +23,17 @@ $title  = 'Review History';
  * screen would show it an empty state that means nothing. Patrick asked on
  * 2 November 2026 that it stay out of the learner area entirely.
  *
- * Settings is the exception, and has to be: it is where the team changes its
- * own password, and a role with no way to do that is worse than one that can
- * see an empty dashboard.
+ * There used to be an exception for Settings, because that was the only place
+ * the team could change its own password. app/admin_settings.php does that now,
+ * so the exception is gone and the separation is complete: no learner page at
+ * all, not even one.
  *
  * This runs before any output, so redirect() can still fire. The reverse
  * direction, a learner reaching an admin page, is held by admin_require() in
  * the requires slot above. */
 if ($user !== null
     && admin_is_admin($user)
-    && !str_starts_with($active, 'admin')
-    && $active !== 'settings') {
+    && !str_starts_with($active, 'admin')) {
     redirect('admin.php');
 }
 ?>

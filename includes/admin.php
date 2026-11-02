@@ -235,6 +235,65 @@ function admin_open_count(): int
 }
 
 /* -------------------------------------------------------------------------
+   The people
+   ------------------------------------------------------------------------- */
+
+/**
+ * Every learner, with how much of the study each of them has actually done.
+ *
+ * Team accounts are excluded. The list exists so a participant's withdrawal
+ * request can be actioned, and the team cannot withdraw itself.
+ *
+ * The counts are what makes it useful rather than a names list: before deleting
+ * somebody you can see what goes with them, and during the evaluation you can
+ * see at a glance who has actually used the system.
+ *
+ * @return list<array<string,mixed>>
+ */
+function admin_users(): array
+{
+    $sql = 'SELECT u.user_id, u.full_name, u.email, u.created_at, u.email_verified_at,
+                   (SELECT COUNT(*) FROM learning_resource r WHERE r.user_id = u.user_id)
+                     AS materials,
+                   (SELECT COUNT(*) FROM topic_progress t WHERE t.user_id = u.user_id)
+                     AS topics,
+                   (SELECT COUNT(*) FROM activity_attempt a WHERE a.user_id = u.user_id)
+                     AS attempts,
+                   (SELECT COUNT(*) FROM support_request s WHERE s.user_id = u.user_id)
+                     AS requests
+              FROM user u
+             WHERE u.is_admin = 0
+          ORDER BY u.user_id';
+
+    return db()->query($sql)->fetchAll();
+}
+
+/**
+ * One learner, by id, for the screens that act on a single person.
+ *
+ * Returns null for a team account as well as for a missing one, so a crafted
+ * id cannot be used to export or delete another admin through a screen meant
+ * for participants.
+ *
+ * @return array<string,mixed>|null
+ */
+function admin_user(int $userId): ?array
+{
+    $stmt = db()->prepare(
+        'SELECT user_id, full_name, email, created_at, is_admin
+           FROM user WHERE user_id = ? LIMIT 1'
+    );
+    $stmt->execute([$userId]);
+    $row = $stmt->fetch();
+
+    if ($row === false || (int) $row['is_admin'] === 1) {
+        return null;
+    }
+
+    return $row;
+}
+
+/* -------------------------------------------------------------------------
    Moving one along
    ------------------------------------------------------------------------- */
 
