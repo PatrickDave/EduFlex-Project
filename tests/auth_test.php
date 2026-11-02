@@ -372,6 +372,45 @@ check('reduced motion stops the arrow moving', (function () {
     return str_contains($block, '.ef-auth-back');
 })());
 
+/* 2 November 2026. Patrick asked for the same way out on the Sign Up page, and
+   admin_login.php is a third door onto the same layout. The three are checked
+   together rather than one at a time, so a fourth public auth page added later
+   fails here until it carries the link too. */
+foreach (['login.php', 'register.php', 'admin_login.php'] as $page) {
+    $html = (string) file_get_contents(__DIR__ . '/../' . $page);
+    $navEnd = (int) strpos($html, '</nav>');
+    $back   = (int) strpos($html, 'ef-auth-back');
+    $card   = (int) strpos($html, 'ef-auth-card');
+
+    check("$page carries the way-out link", $back > 0);
+
+    check("$page puts it above the card, not in the nav",
+        $back > $navEnd && $back < $card);
+
+    check("$page wraps the link and the card together",
+        substr_count($html, 'class="ef-auth-stack"') === 1
+        && str_contains($html, '/.ef-auth-stack'));
+}
+
+/* The two learner-facing doors both go home. admin_login.php deliberately does
+   not: it is the team's door, it has no business on the marketing page, and
+   the one place a person lands there by mistake is from the learner door. Its
+   link says "Learner sign-in" and goes back to login.php. Asserted so the
+   difference is recorded as a decision rather than read later as an oversight. */
+foreach (['login.php', 'register.php'] as $page) {
+    $html = (string) file_get_contents(__DIR__ . '/../' . $page);
+    check("$page says Back to Home", str_contains($html, 'Back to Home'));
+    check("$page points it at the landing page",
+        (bool) preg_match('/<a href="index\.php" class="ef-auth-back">/', $html));
+}
+
+check('admin_login.php sends the team back to the learner door instead',
+    (function () {
+        $html = (string) file_get_contents(__DIR__ . '/../admin_login.php');
+        return (bool) preg_match('/<a href="login\.php" class="ef-auth-back">/', $html)
+            && !str_contains($html, 'Back to Home');
+    })());
+
 /* --------------------------------------------------------- cache busting */
 
 section('Our own CSS and JS carry a version');

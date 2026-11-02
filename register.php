@@ -58,7 +58,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </nav>
 
   <main class="ef-auth-body">
-    <div class="ef-auth-card">
+    <?php /* Same placement as login.php: above the card and aligned with its
+             left edge, not in the nav beside the logo. Kept identical on both
+             pages so a learner who steps between them sees the way out in the
+             one place. See the note in login.php for why the nav is wrong. */ ?>
+    <div class="ef-auth-stack">
+
+      <a href="index.php" class="ef-auth-back">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M9.8 3.4 5.2 8l4.6 4.6" stroke="currentColor"
+                stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Back to Home
+      </a>
+
+      <div class="ef-auth-card">
 
       <h2>Create Your Account</h2>
       <p class="ef-auth-sub">Start your personalized learning journey with EduFlex.</p>
@@ -151,7 +165,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <p class="ef-auth-foot">
         Already have an account? <a href="login.php">Log In</a>
       </p>
-    </div>
+      </div><!-- /.ef-auth-card -->
+
+    </div><!-- /.ef-auth-stack -->
   </main>
 
 <?php include __DIR__ . '/partials/public_footer.php'; ?>

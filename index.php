@@ -58,7 +58,7 @@ security_headers();
     </p>
 
     <div class="ef-hero-ctas">
-      <a href="register.php" class="ef-btn ef-btn-primary ef-btn-lg">Get Started for Free</a>
+      <a href="register.php" class="ef-btn ef-btn-primary ef-btn-lg">Get Started</a>
       <?php /* Keeps href="#how" on purpose. With JavaScript this opens the
                dialog; without it, it still scrolls to the section, where the
                poster and its play badge are. A button that does nothing when a
