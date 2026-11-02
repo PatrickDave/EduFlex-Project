@@ -253,7 +253,7 @@ includes/
   subscription.php  plans, the free/premium tiers, the Settings plan card
   exams.php       mock examinations: topic choice, assembly, breakdown
   admin.php       the support queue: who may read it, and moving one along
-app/              sixteen GENERATED pages, plus app/actions/*.php endpoints
+app/              seventeen GENERATED pages, plus app/actions/*.php endpoints
 partials/         sidebar.php and topbar.php for the app, public_footer.php
                   for index/login/register/privacy/terms
 database/         01_schema.sql (fresh install, destructive),
@@ -274,13 +274,13 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1301 PHP checks across eighteen suites, all passing, plus 169 browser checks:
+1348 PHP checks across eighteen suites, all passing, plus 169 browser checks:
 
 ```
-auth 73 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
+auth 87 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 39 | settings 60 | security 79 | avatar 87
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
-verification 92 | admin 119
+verification 101 | admin 143
 runner_browser 54 | chat_browser 29 | video_browser 28 | password_browser 23
 modules_browser 35
 ```
@@ -309,6 +309,9 @@ be written into the manuscript:
 7. `user.avatar_path`, for profile pictures
 8. `activity_item.topic_progress_id` and `activity_item.bloom_level`, so an
    item can carry its own when a mock examination spans several
+9. `user.is_admin`, for the help desk
+10. `trusted_browser` keyed on `(token_hash, user_id)` rather than the token
+    alone, so one browser can be trusted for more than one account
 
 Unresolved: `topic_progress` is keyed on `(user_id, resource_id, topic_name)`, so
 one topic appearing in two uploads produces two separate mastery scores. The
@@ -607,6 +610,44 @@ will use**. That gives the browser a seven-day trust grant, so the first
 sign-in does not need a code emailed to the team inbox. Creating the row from
 the command line skips that grant.
 
+## The team's own Settings
+
+2 November 2026. Clicking Settings as an admin landed on `app/settings.php`, a
+learner screen: Personal details, a plan card, an export of "your" learning,
+none of which a shared team address has. Worse, `$active` was `'settings'`, so
+the sidebar rendered the LEARNER nav and the help desk vanished mid-session.
+Patrick reported exactly that.
+
+`app/admin_settings.php` keeps profile picture, change password and delete this
+account. Personal details, the plan card and email verification are gone.
+**"Your data" became Users**, which is where a participant's withdrawal request
+gets actioned: export their data or delete their account, both reusing
+`auth_export_data()` and `auth_delete_account()` rather than a second
+implementation.
+
+`admin_user()` returns null for a team account as well as a missing one, so a
+crafted id cannot export or delete another admin through a screen meant for
+participants. Deleting still requires the address typed, and that check is worth
+more here than on the learner page because the person typing is not the person
+being deleted.
+
+**The learner-Settings exception in the SHELL guard is gone.** It existed only
+because that was the team's one way to change a password. The separation is now
+complete: an admin reaches no learner page at all.
+
+**`auth_settings_page()` is why the shared endpoints still work.**
+`change_password`, `save_avatar`, `delete_avatar` and `delete_account` are
+posted to by BOTH settings pages, and all four redirected to `settings.php`.
+For an admin the guard then bounced that to the help desk, where nothing reads
+`flash_get('password_ok')`: the password really did change and the screen said
+nothing. Third time that shape of bug has appeared, after the two sign-in doors
+and the dashboard flash.
+
+One wording fix worth keeping: `auth_delete_account()` says "Type **your own**
+email address exactly", which is right on the learner page and wrong when an
+admin deletes somebody else. `admin_user_delete.php` rewords it rather than
+changing the source, because the learner page still needs the original.
+
 ## Help and FAQ (Appendix R 7.3)
 
 `app/help.php`, in the learner nav. Nine answers in `<details>` elements:
@@ -622,6 +663,81 @@ and the band constants rather than hard-coding them.
 These answers used to be a card at the bottom of `app/support.php`. They are
 not any more: Support links here instead. **One copy, asserted.** Two copies of
 the same text is two places to update and one place to forget.
+
+## One browser, two accounts
+
+2 November 2026. Patrick reported that email verification appeared on every
+sign-in even after ticking "trust this browser for 7 days".
+
+**`trusted_browser` was keyed on `token_hash` alone, and the cookie holds one
+token.** Trusting a second account minted a new token and overwrote the cookie:
+the first account's row stayed in the table while the browser no longer held its
+token, so the next sign-in as that account asked for a code again. Trust one,
+lose the other, alternating forever. His table held four unreachable rows for one
+account and three for another, which is what gave it away.
+
+He was switching between his learner account and `eduflex54@gmail.com` in the
+same browser, which is a pattern this project created when the two sign-in doors
+were built.
+
+**The fix has two halves and both are needed:**
+
+- The key is now `(token_hash, user_id)`. See SCHEMA-NOTES.md 10.
+- `trusted_browser_store()` reuses this browser's existing token instead of
+  minting a new one. The token identifies the BROWSER; the row's `user_id` and
+  `credential_hash` bind it to an account.
+
+The key alone still leaves the cookie being overwritten. The reuse alone cannot
+store the second row: the INSERT violates the old primary key and registration
+reports "Could not create the account", which is exactly what happened when the
+reuse was written first.
+
+**Declining to trust no longer clears the cookie.** It used to, which threw away
+the browser token and with it every other account's trust on that machine. The
+row for that account is deleted, which is what declining means.
+
+Three things ruled out along the way, each checked rather than assumed: the
+cookie path (correct at `/eduflex-ui/`), the `Secure` flag (`security_is_https()`
+returns false on localhost, so the cookie is sent over http), and password
+rehashing on login (`password_needs_rehash()` is false for every account, so the
+credential hash is stable).
+
+Rows created before the fix are unreachable but harmless, and expire within
+seven days.
+
+## The verification code landing in Spam
+
+2 November 2026. One real defect, and an honest limit on what can be fixed in
+code.
+
+The defect: PHPMailer builds `Message-ID` from `gethostname()`, which on
+Patrick's machine is `Charles`, so every code email carried `<...@Charles>`.
+That is not a fully qualified domain and reads as misconfigured to a receiving
+filter. `includes/mail.php` now sets `$mail->Hostname` from the `from_email`
+domain, giving `<...@gmail.com>`, and adds a `Reply-To`.
+
+**That is one weak signal among many and almost certainly not the whole
+reason.** The SMTP config was already correct: `username` and `from_email` are
+both `eduflex54@gmail.com`, so SPF and DKIM align and the usual cause is ruled
+out. What remains is reputation and content, none of it a code problem:
+
+- a brand-new Gmail account with no sending history,
+- a body shaped exactly like phishing (six digits, "expires in 10 minutes",
+  "never share your code"),
+- many near-identical sends during testing,
+- mail addressed to the same mailbox it is sent from, which is what happens
+  when the team account verifies itself.
+
+Gmail publishes no reasons, so do not claim a code change fixed this.
+
+**What actually makes it a non-issue for the defense** is the trusted-browser
+fix above: one verification per browser per seven days, not one per sign-in.
+On the demo machine, sign in once, tick trust, and the panel never sees an
+email step. Belt and braces on the receiving side is a Gmail filter, from
+`eduflex54@gmail.com`, "Never send it to Spam".
+
+An HTML message with EduFlex branding would read as more legitimate than bare
+text. That is a genuine improvement and a cosmetic one; it was not done.
 
 ## Still to do
 
