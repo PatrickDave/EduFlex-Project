@@ -50,7 +50,25 @@ function mail_send_text(string $email, string $subject, string $body): bool
         $mail->SMTPSecure = $mail->Port === 465 ? 'ssl' : 'tls';
         $mail->Timeout = 15;
         $mail->CharSet = 'UTF-8';
+
+        /* Without this, PHPMailer builds the Message-ID from gethostname(),
+         * which on Patrick's machine is "Charles". A Message-ID of
+         * <...@Charles> is not a fully qualified domain and reads as
+         * misconfigured to a receiving filter. Deriving it from the sending
+         * address gives <...@gmail.com>, which matches the authenticated
+         * account the mail is actually sent through.
+         *
+         * This is one small signal among many. It is not on its own why Gmail
+         * filed the code as spam, and fixing it does not guarantee the inbox. */
+        $domain = substr(strrchr((string) $config['from_email'], '@') ?: '', 1);
+        if ($domain !== '') {
+            $mail->Hostname = $domain;
+        }
+
         $mail->setFrom((string) $config['from_email'], (string) $config['from_name']);
+        // Somewhere for a confused participant to reply. A transactional
+        // message with no route back is itself a small negative signal.
+        $mail->addReplyTo((string) $config['from_email'], (string) $config['from_name']);
         $mail->addAddress($email);
         $mail->Subject = $subject;
         $mail->Body = $body;
