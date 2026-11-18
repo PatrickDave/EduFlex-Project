@@ -32,10 +32,38 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/helpers.php';
 
+/**
+ * The directory that `storage/avatars/...` paths are resolved against.
+ *
+ * Normally the project root. The CLI override exists because
+ * `tests/avatar_test.php` ends by deleting every file in the avatar directory
+ * and asserting it is empty. With the root hard-coded that teardown ran
+ * against the REAL directory, so `./run_tests.sh` silently destroyed whatever
+ * profile picture had been uploaded through the browser. Patrick reported his
+ * vanishing on 18 November 2026; the suite had removed it minutes earlier,
+ * while its own docblock claimed it ran against a scratch directory. Rule 16.
+ *
+ * It is the ROOT that is overridable and not `avatar_dir()` alone, because a
+ * stored path keeps its literal `storage/avatars/` prefix and is resolved in
+ * three other places. Moving only the directory desynchronises writing from
+ * reading, and every lookup then misses.
+ *
+ * Guarded on PHP_SAPI so a web request cannot reach it, the same shape as the
+ * test injection in `mail_config()`.
+ */
+function avatar_root(): string
+{
+    // Explicit test injection, inaccessible to web requests.
+    if (PHP_SAPI === 'cli' && isset($GLOBALS['eduflex_test_avatar_root'])) {
+        return rtrim((string) $GLOBALS['eduflex_test_avatar_root'], '/\\');
+    }
+    return __DIR__ . '/..';
+}
+
 /** Where profile pictures are written. Under storage/, so Apache denies it. */
 function avatar_dir(): string
 {
-    return __DIR__ . '/../storage/avatars';
+    return avatar_root() . '/storage/avatars';
 }
 
 /** 3 MB. A profile picture has no reason to be larger. */
@@ -248,7 +276,7 @@ function avatar_unlink(string $relativePath): void
         return;
     }
 
-    $absolute = __DIR__ . '/../' . $relativePath;
+    $absolute = avatar_root() . '/' . $relativePath;
     if (is_file($absolute)) {
         @unlink($absolute);
     }
@@ -374,7 +402,7 @@ function avatar_relative_path(int $userId): ?string
     }
 
     $path = (string) $path;
-    if (!is_file(__DIR__ . '/../' . $path)) {
+    if (!is_file(avatar_root() . '/' . $path)) {
         return $cache[$userId] = null;
     }
 
@@ -418,7 +446,7 @@ function avatar_url(int $userId, string $prefix = 'actions/'): ?string
         return null;
     }
 
-    $version = @filemtime(__DIR__ . '/../' . $path) ?: 0;
+    $version = @filemtime(avatar_root() . '/' . $path) ?: 0;
     return $prefix . 'avatar_show.php?v=' . $version;
 }
 

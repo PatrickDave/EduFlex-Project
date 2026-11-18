@@ -158,6 +158,30 @@ EDUFLEX_CHROMIUM="C:/Program Files/Google/Chrome/Application/chrome.exe"
     why it is worth a rule rather than a comment. `tests/auth_test.php` fails if
     any page in the root or in `app/` links either file bare.
 19. Prefer `Read`/`Edit` over shell redirection for file work.
+20. **A test suite must never write to, or delete from, a real `storage/`
+    directory.** `tests/avatar_test.php` ended by deleting every file in
+    `storage/avatars/` and asserting the directory was empty, against the REAL
+    one, so `./run_tests.sh` destroyed Patrick's uploaded profile picture every
+    single run. He reported it on 18 November 2026 as "the picture does not
+    stay"; it stayed fine until the next test run. Its own docblock already
+    claimed it ran against a scratch directory, which is how it went unnoticed.
+
+    The fix is `avatar_root()`, overridable only under `PHP_SAPI === 'cli'`,
+    the same shape as the injection in `mail_config()`. **Override the ROOT,
+    not `avatar_dir()`**: a stored path keeps its literal `storage/avatars/`
+    prefix and is resolved in three other places, so moving only the directory
+    desynchronises writing from reading and every lookup misses. That was tried
+    first and broke sixteen checks.
+
+    Two guards now: the suite asserts up front that it is pointed somewhere
+    other than the real directory, and the teardown refuses to delete anything
+    if those two paths ever resolve the same. Proved by leaving a sentinel file
+    in the real directory and running the whole suite over it.
+
+    **This is rule 16 in a place nobody was looking.** Rule 16 is about not
+    running destructive SQL by hand; this was a green test suite quietly doing
+    it on every run. When a suite touches the filesystem, check WHICH
+    filesystem.
 
 ## The mastery model
 
@@ -279,11 +303,11 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1348 PHP checks across eighteen suites, all passing, plus 172 browser checks:
+1352 PHP checks across eighteen suites, all passing, plus 172 browser checks:
 
 ```
 auth 87 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
-notifications 77 | support 39 | settings 60 | security 79 | avatar 87
+notifications 77 | support 39 | settings 60 | security 79 | avatar 91
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
 verification 101 | admin 143
 runner_browser 54 | chat_browser 29 | video_browser 31 | password_browser 23

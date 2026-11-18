@@ -52,6 +52,29 @@ $pdo->exec("INSERT INTO user (full_name, email) VALUES ('Other Learner', 'other@
 $tmp = sys_get_temp_dir() . '/eduflex_avatar_' . bin2hex(random_bytes(5));
 mkdir($tmp, 0775, true);
 
+/* The directory avatar_dir() hands out for the rest of this file.
+ *
+ * Without this the suite wrote to, and at the end DELETED everything in, the
+ * real storage/avatars. Running ./run_tests.sh therefore destroyed whatever
+ * profile picture was uploaded through the browser, which is exactly what
+ * happened to Patrick's on 18 November 2026. The docblock at the top of this
+ * file already promised a scratch directory; this is what makes that true.
+ *
+ * Set before the first call to any avatar function, and asserted below so the
+ * protection cannot be quietly lost. */
+$avatarHome = sys_get_temp_dir() . '/eduflex_root_' . bin2hex(random_bytes(5));
+mkdir($avatarHome . '/storage/avatars', 0775, true);
+$GLOBALS['eduflex_test_avatar_root'] = $avatarHome;
+
+check('the suite is pointed at a scratch root, not the project',
+    realpath(avatar_root()) === realpath($avatarHome));
+
+check('so the avatar directory is a scratch one too',
+    realpath(avatar_dir()) === realpath($avatarHome . '/storage/avatars'));
+
+check('and it is NOT the real avatar directory',
+    realpath(avatar_dir()) !== realpath(__DIR__ . '/../storage/avatars'));
+
 /* The smallest valid files of each type, written as bytes rather than drawn,
    because GD is not enabled on the development machine and these tests must not
    depend on it. Each one is a real image that getimagesize() parses. */
@@ -167,7 +190,7 @@ check('a path is returned',        is_string($stored['path']));
 check('it is inside the avatar directory',
     str_starts_with((string) $stored['path'], 'storage/avatars/'));
 check('the file is on disk',
-    is_file(__DIR__ . '/../' . $stored['path']));
+    is_file(avatar_root() . '/' . $stored['path']));
 check('the row records it',
     (string) $pdo->query('SELECT avatar_path FROM user WHERE user_id = 1')->fetchColumn()
         === $stored['path']);
@@ -297,14 +320,14 @@ check('every refusal names a reason the learner can act on', (function () use ($
 section('Replacing a picture removes the old file');
 
 $first  = avatar_relative_path(1);
-$firstAbsolute = __DIR__ . '/../' . $first;
+$firstAbsolute = avatar_root() . '/' . $first;
 $second = avatar_store(1, $upload($copyOf($png)));
 
 check('the replacement is stored',        $second['ok'] === true);
 check('the path changed',                 $second['path'] !== $first);
 check('the row points at the new file',   avatar_relative_path(1) === $second['path']);
 check('the old file is gone from disk',   !is_file($firstAbsolute));
-check('the new file is on disk',          is_file(__DIR__ . '/../' . $second['path']));
+check('the new file is on disk',          is_file(avatar_root() . '/' . $second['path']));
 check('the learner still has exactly one picture', (function () {
     return count(glob(avatar_dir() . '/1_*') ?: []) === 1;
 })());
@@ -315,7 +338,7 @@ section('Removing a picture');
 
 $path = avatar_relative_path(1);
 check('removal reports success',   avatar_remove(1) === true);
-check('the file is gone',          !is_file(__DIR__ . '/../' . $path));
+check('the file is gone',          !is_file(avatar_root() . '/' . $path));
 check('the row is cleared', (function () use ($pdo) {
     return $pdo->query('SELECT avatar_path FROM user WHERE user_id = 1')->fetchColumn() === null;
 })());
@@ -458,8 +481,14 @@ check('forgetting everybody clears the whole cache', (function () {
 
 /* ---------------------------------------------------------------- cleanup */
 
-foreach (glob(avatar_dir() . '/*') ?: [] as $file) {
-    @unlink($file);
+/* Only ever the scratch directory. The guard is belt and braces on top of the
+   injection above: if a future change loses the override, this refuses to
+   delete anything rather than wiping a real person's profile picture. */
+if (realpath(avatar_dir()) !== realpath(__DIR__ . '/../storage/avatars')) {
+    foreach (glob(avatar_dir() . '/*') ?: [] as $file) {
+        @unlink($file);
+    }
+    @rmdir(avatar_dir());
 }
 foreach (glob($tmp . '/*') ?: [] as $file) {
     @unlink($file);
@@ -467,7 +496,10 @@ foreach (glob($tmp . '/*') ?: [] as $file) {
 @rmdir($tmp);
 
 check('the suite leaves no avatar files behind',
-    count(glob(avatar_dir() . '/*') ?: []) === 0);
+    count(glob($avatarHome . '/storage/avatars/*') ?: []) === 0);
+
+check('and it never touched the real avatar directory',
+    realpath(avatar_dir()) !== realpath(__DIR__ . '/../storage/avatars'));
 
 echo "\n=============================\n";
 echo "Passed: $passed   Failed: $failed\n";
