@@ -274,14 +274,14 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1348 PHP checks across eighteen suites, all passing, plus 169 browser checks:
+1348 PHP checks across eighteen suites, all passing, plus 172 browser checks:
 
 ```
 auth 87 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 39 | settings 60 | security 79 | avatar 87
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
 verification 101 | admin 143
-runner_browser 54 | chat_browser 29 | video_browser 28 | password_browser 23
+runner_browser 54 | chat_browser 29 | video_browser 31 | password_browser 23
 modules_browser 35
 ```
 
@@ -402,10 +402,9 @@ Three things there are load-bearing, all asserted in
 `transform: none !important` in the reduced-motion block has to be overridden
 for it or the badge lands in the corner. Both suites check this.
 
-Known and NOT caused by the video: `index.php` scrolls sideways by about 123px
-at 390px wide. The Methodology card holds a `<pre class="ef-formula">` that
-cannot wrap and an `.ef-table` of Bloom weights, and together they force a 493px
-floor. It predates the video and is still unfixed.
+Fixed 18 November 2026: `index.php` used to scroll sideways by about 123px at
+390px wide. See "The sideways scroll on the landing page" below. It was never
+caused by the video.
 
 ## The first real topic detection, and what it caught
 
@@ -738,6 +737,35 @@ email step. Belt and braces on the receiving side is a Gmail filter, from
 
 An HTML message with EduFlex branding would read as more legitimate than bare
 text. That is a genuine improvement and a cosmetic one; it was not done.
+
+## The sideways scroll on the landing page
+
+Fixed 18 November 2026, after sitting open since the video went in. It mattered
+because the Android build is a WebView over these pages, so a page that scrolls
+sideways on a phone is the mobile product.
+
+**The recorded diagnosis was wrong**, and is worth keeping as a warning. It
+blamed the `<pre class="ef-formula">` and the `.ef-table` of Bloom weights in
+the Methodology card. Both are innocent: the `pre` already carries
+`overflow-x: auto` and `min-width: 0`, and cloning every descendant of that
+card into a zero-width probe found nothing with a min-content width over 300px.
+
+The cause is one declaration. `.ef-row` sets `align-items: flex-start`, which
+is right for a row, where it stops two cards of unequal height stretching to
+match. At 860px the row flips to `flex-direction: column`, and the cross axis
+becomes horizontal: the same declaration now means "shrink each card to fit its
+content", so the widest content in the card set the width of the whole page.
+Restoring `align-items: stretch` inside the 860px block fixes it.
+
+**The tell, and the thing worth reusing: the overflow did not shrink with the
+screen.** 513px at a 390px viewport, 511px at 360, 511px at 320. A genuine
+content overflow tracks the viewport, because the content is what is too wide.
+A number that stays put is a sizing mode, not a wide element. Measuring three
+widths is what turned a two-month-old guess into a one-line fix.
+
+`tests/video_browser_test.py` now asserts the whole page at all three widths,
+which is what the note in that suite always said to do once this was fixed. One
+width would pass again on a layout whose floor merely dropped just under 390.
 
 ## Still to do
 

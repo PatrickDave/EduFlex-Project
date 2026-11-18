@@ -2575,6 +2575,23 @@ p { margin: 0; }
 
 @media (max-width: 860px) {
   .ef-row { flex-direction: column; }
+
+  /* align-items: flex-start is right for a ROW: it stops two cards of
+     different heights stretching to match. Once the row flips to a column the
+     cross axis is horizontal, so the same declaration means "shrink each card
+     to fit its content" instead, and the widest content in the card sets the
+     width of the page. That is what made index.php scroll sideways by 123px at
+     390px wide: measured 513 against a 390 viewport, and 511 at both 360 and
+     320, which is the giveaway, because a real content overflow would shrink
+     with the screen and this did not.
+
+     It was blamed for a long time on the <pre class="ef-formula"> and the
+     Bloom weights table inside the Methodology card. Both are innocent: the
+     pre already carries overflow-x: auto and min-width: 0, and no descendant
+     of that card has a min-content width over 300px. Restoring stretch for the
+     column direction fixes every width at once. */
+  .ef-row { align-items: stretch; }
+
   .ef-col-fixed-360 { flex: 1 1 auto; width: 100%; }
   .ef-hide-sm { display: none; }
 }

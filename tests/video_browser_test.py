@@ -150,14 +150,28 @@ with sync_playwright() as p:
     phone = browser.new_page(viewport={"width": 390, "height": 844})
     phone.goto(BASE + "/index.php", wait_until="load")
     phone.wait_for_timeout(500)
-    # This suite asserts the VIDEO does not overflow, not the whole page.
+    # 18 November 2026: the sideways scroll is fixed, so this check is widened
+    # from the video to the whole page, as the note here used to say to do.
     #
-    # The page does scroll sideways at 390px, by 123px, and it did so before the
-    # video existed: the Methodology card holds a <pre class="ef-formula"> that
-    # cannot wrap and an .ef-table of Bloom weights, and together they force a
-    # 493px floor inside a 390px screen. Asserting the whole page here would
-    # make this suite fail for a defect in a different section, which is how a
-    # red suite stops meaning anything. Fix that one, then widen this check.
+    # It was 123px at 390px wide and was blamed on the <pre class="ef-formula">
+    # and the Bloom weights table in the Methodology card. Both were innocent.
+    # .ef-row sets align-items: flex-start, which is right for a row and means
+    # "shrink to fit content" once the row flips to a column at 860px, so the
+    # widest content set the width of the page. The tell was that the overflow
+    # did not shrink with the screen: 513 at 390, 511 at 360, 511 at 320. A real
+    # content overflow tracks the viewport. One declaration restores stretch.
+    #
+    # Checked at three widths for that reason. A single width would pass again
+    # on a layout that merely has a floor just under 390.
+    for width in (390, 360, 320):
+        phone.set_viewport_size({"width": width, "height": 844})
+        phone.wait_for_timeout(250)
+        check("the landing page does not scroll sideways at %dpx" % width,
+              phone.evaluate("w => document.documentElement.scrollWidth <= w + 1",
+                             width))
+    phone.set_viewport_size({"width": 390, "height": 844})
+    phone.wait_for_timeout(250)
+
     check("the poster does not overflow the screen",
           phone.evaluate("""() => {
               const r = document.querySelector('.ef-video-trigger').getBoundingClientRect();
