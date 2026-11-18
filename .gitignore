@@ -41,5 +41,23 @@ Desktop.ini
 __pycache__/
 *.pyc
 
+# Android build outputs. The project under android/ IS committed; what Gradle
+# produces from it is not.
+#
+# local.properties is the important one: Android Studio writes the absolute
+# path of the SDK on whichever machine opened the project, so committing it
+# gives every teammate a path that does not exist on their laptop. Android
+# Studio recreates it on first open.
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/.cxx/
+android/captures/
+
+# The built APK lands in android/app/build/, which the line above covers. To
+# hand the team a copy, attach it to a GitHub release or send the file; do not
+# commit a binary that changes on every build.
+
 # Delivery archives. The repository is the source of truth, not a zip.
 *.zip

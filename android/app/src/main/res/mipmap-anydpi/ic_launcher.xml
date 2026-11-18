@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 7.0 and 7.1, which predate adaptive icons. Same mark, but it has to
+  carry its own background and its own corner rounding, because nothing masks
+  it on these versions.
+
+  A vector rather than the usual set of five PNGs at five densities. minSdk is
+  24 and VectorDrawable has been supported natively since 21, so the PNGs would
+  be five files to generate and keep in step for two Android versions.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:pathData="M22,4 L86,4 A18,18 0 0,1 104,22 L104,86 A18,18 0 0,1 86,104 L22,104 A18,18 0 0,1 4,86 L4,22 A18,18 0 0,1 22,4 Z"
+        android:fillColor="#0B2434" />
+
+    <path
+        android:pathData="M36,78 L36,60"
+        android:strokeColor="#7FE6F7"
+        android:strokeWidth="13"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,78 L54,46"
+        android:strokeColor="#3DDBF2"
+        android:strokeWidth="13"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M72,78 L72,32"
+        android:strokeColor="#22D3EE"
+        android:strokeWidth="13"
+        android:strokeLineCap="round" />
+</vector>

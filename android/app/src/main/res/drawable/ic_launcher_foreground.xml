@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Three ascending bars, which is the growth chart the Growth screen draws with
+  .ef-bars. The mark means the same thing as the product: a mastery score going
+  up over time.
+
+  Drawn as stroked lines with round caps rather than as rounded rectangles,
+  because a line plus strokeLineCap is four numbers and a rounded rect path is
+  twelve, and the two render identically.
+
+  Adaptive icons are 108x108 with only the middle 66x66 guaranteed visible, so
+  everything here stays between 21 and 87 on both axes.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:pathData="M36,78 L36,60"
+        android:strokeColor="#7FE6F7"
+        android:strokeWidth="13"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,78 L54,46"
+        android:strokeColor="#3DDBF2"
+        android:strokeWidth="13"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M72,78 L72,32"
+        android:strokeColor="#22D3EE"
+        android:strokeWidth="13"
+        android:strokeLineCap="round" />
+</vector>

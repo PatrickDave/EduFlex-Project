@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A framework theme, not a Material one. Material themes live in
+     com.google.android.material, which would be a dependency to download; this
+     project deliberately has none. See app/build.gradle. -->
+<resources>
+    <style name="Theme.EduFlex" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/ef_ink</item>
+        <item name="android:colorPrimaryDark">@color/ef_ink</item>
+        <item name="android:colorAccent">@color/ef_cyan</item>
+        <item name="android:windowBackground">@color/ef_bg</item>
+        <item name="android:statusBarColor">@color/ef_ink</item>
+    </style>
+</resources>

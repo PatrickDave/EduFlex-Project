@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Taken from the :root custom properties in assets/css/eduflex.css so the
+     app chrome and the pages inside it are the same blue. If those change,
+     change these. -->
+<resources>
+    <color name="ef_cyan">#22D3EE</color>
+    <color name="ef_ink">#0B2434</color>
+    <color name="ef_bg">#F6FBFD</color>
+    <color name="ef_white">#FFFFFF</color>
+</resources>

@@ -1,0 +1,11 @@
+// Root build file. The Android Gradle Plugin version and the Gradle version in
+// gradle/wrapper/gradle-wrapper.properties have to be a matching pair; AGP 8.1
+// wants Gradle 8.0 or newer and a JDK 17. If you change one, change both.
+
+plugins {
+    id 'com.android.application' version '8.1.4' apply false
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.buildDir
+}

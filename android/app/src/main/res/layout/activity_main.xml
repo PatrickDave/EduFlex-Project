@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/ef_bg">
+
+    <WebView
+        android:id="@+id/web"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- A thin loading line at the very top. The pages are server rendered, so
+         on a phone over USB there is a visible pause between the tap and the
+         new screen; without this the app looks frozen. -->
+    <ProgressBar
+        android:id="@+id/progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_gravity="top"
+        android:max="100"
+        android:progressTint="@color/ef_cyan"
+        android:progressBackgroundTint="@android:color/transparent"
+        android:visibility="gone" />
+
+    <!-- Where a fullscreen <video> is parented. Empty and gone until the page
+         asks, via WebChromeClient.onShowCustomView. -->
+    <FrameLayout
+        android:id="@+id/fullscreen_host"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/black"
+        android:visibility="gone" />
+
+</FrameLayout>

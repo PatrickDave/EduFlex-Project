@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EduFlex</string>
+
+    <string name="action_reload">Reload</string>
+    <string name="action_home">Home</string>
+    <string name="action_server">Server address</string>
+
+    <string name="server_title">Where is EduFlex running?</string>
+    <string name="server_help">Over USB, run adb reverse tcp:8080 tcp:80 on the laptop and use http://localhost:8080/eduflex-ui/\n\nOn the same wifi, use the laptop\'s own address from ipconfig, for example http://192.168.1.14/eduflex-ui/</string>
+    <string name="server_connect">Connect</string>
+    <string name="server_use_default">Use default</string>
+
+    <string name="pick_file">Choose a file</string>
+    <string name="no_picker">No app on this phone can pick a file.</string>
+    <string name="no_dialer">No dialer on this phone.</string>
+    <string name="no_mail">No email app on this phone.</string>
+    <string name="no_browser">No browser on this phone.</string>
+
+    <string name="downloading">Saving %1$s to Downloads</string>
+    <string name="download_failed">Could not start the download.</string>
+</resources>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_reload"
+        android:title="@string/action_reload"
+        android:showAsAction="never" />
+    <item
+        android:id="@+id/action_home"
+        android:title="@string/action_home"
+        android:showAsAction="never" />
+    <!-- Kept so moving between USB, wifi and the emulator does not mean
+         rebuilding and reinstalling the APK. -->
+    <item
+        android:id="@+id/action_server"
+        android:title="@string/action_server"
+        android:showAsAction="never" />
+</menu>

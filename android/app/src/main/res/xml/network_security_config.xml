@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP is permitted, deliberately, and this file is the reason the app
+  shows pages instead of a blank screen.
+
+  Since Android 9 cleartext is blocked by default. EduFlex is served by XAMPP
+  over plain http on a laptop on the same network as the phone, or over a USB
+  bridge, so without this every request fails with ERR_CLEARTEXT_NOT_PERMITTED
+  and the WebView renders nothing. That failure gives no visible reason, which
+  is how it costs an afternoon.
+
+  A per-host list is not enough here: the laptop's LAN address changes with the
+  network, and network-security-config matches domains, not subnets, so
+  192.168.*.* cannot be expressed. A demo app that only ever talks to a machine
+  in the same room is the one case where permitting cleartext broadly is the
+  honest answer rather than a shortcut.
+
+  WHEN EduFlex IS SERVED OVER HTTPS (Still to do, item 3), delete the
+  base-config below and keep only the localhost entries. At that point
+  security_is_https() turns on the Secure cookie flag and HSTS by itself, and
+  leaving this file as it is would quietly undo part of that.
+-->
+<network-security-config>
+
+    <base-config cleartextTrafficPermitted="true" />
+
+    <!-- Named so the intent is recorded even though base-config already covers
+         them. 10.0.2.2 is how the Android emulator reaches the host machine;
+         localhost is what `adb reverse` maps to the laptop over USB. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+
+</network-security-config>

@@ -1,0 +1,21 @@
+// EduFlex Android: a WebView over the same responsive pages the browser serves.
+// See android/README.md for why this is a wrapper and not a second build.
+
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "EduFlex"
+include ':app'

@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'ph.edu.uc.eduflex'
+
+    // 34 is Android 14. Deliberately not the newest: this APK is sideloaded for
+    // a defense, never published to Play, so there is no store deadline to
+    // chase and a conservative target is one less thing to go wrong on the day.
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "ph.edu.uc.eduflex"
+
+        // Android 7.0. Covers essentially every handset the panel might hold,
+        // and WebView on 24 already supports everything this app asks of it.
+        minSdk 24
+        targetSdk 34
+
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        debug {
+            // What you install for the defense. `assembleDebug` signs with the
+            // local debug key, so there is no keystore to create or lose.
+            applicationIdSuffix ""
+            minifyEnabled false
+        }
+        release {
+            // Needs a signing config before it will install. Not required for
+            // the defense; see README.md "If you want a release build".
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// No dependencies, on purpose.
+//
+// Every entry here is an artifact Gradle has to download before the app will
+// build, and this project is built on a connection where large downloads time
+// out. The app uses android.app.Activity, the framework AlertDialog and the
+// framework WebView, so the only thing Gradle must fetch is the plugin itself.
+// That is the difference between a build that works the first time and an
+// afternoon of failed resolutions.
+dependencies {
+}

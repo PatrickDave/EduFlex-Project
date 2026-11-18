@@ -9,7 +9,9 @@ EduFlex: AI-Powered Personalized Learning Companion. A BSIT capstone project at
 the University of Cebu Main, College of Computer Studies. Patrick Cagas is the
 group leader and lead researcher.
 
-**Oral defense: second or third week of November 2026. Feature freeze 19 October.**
+**Final oral defense: 4 to 12 December 2026.** Patrick confirmed this on
+18 November 2026; this file previously said the second or third week of
+November, which was wrong. Feature freeze 19 October.
 
 The system takes a document a student uploads, reads it, works out what topics it
 covers, writes practice questions from it, scores the answers, and tracks mastery
@@ -19,7 +21,8 @@ per topic. A chat companion answers questions from that same material.
 
 - PHP 8.x, MySQL 8.0 / MariaDB, Apache. Patrick runs XAMPP on Windows.
 - Bootstrap 5.3.3 and jQuery 3.7.1, vendored under `assets/vendor/`.
-- Android is a WebView over these same responsive pages. It is not a second build.
+- Android is a WebView over these same responsive pages. It is not a second
+  build. The project is in `android/`; see "The Android wrapper" below.
 
 ```
 # FIRST INSTALL ONLY. This drops and recreates the eduflex database.
@@ -264,6 +267,8 @@ tools/            rubric_run.php (the only script that spends quota),
                   ai_ping.php (prove a key for one request),
                   make_admin.php (grant or revoke help desk access)
 build_pages.py    regenerates app/*.php from one shell template
+android/          the WebView APK: an Android Studio project with no
+                  dependencies, never yet compiled. See android/README.md
 ```
 
 `AI-OPTIONS.md` covers provider choice. `SETUP.md` is the install guide.
@@ -737,6 +742,47 @@ email step. Belt and braces on the receiving side is a Gmail filter, from
 
 An HTML message with EduFlex branding would read as more legitimate than bare
 text. That is a genuine improvement and a cosmetic one; it was not done.
+
+## The Android wrapper
+
+Built 18 November 2026, when Patrick chose a WebView APK over a PWA. Lives in
+`android/`, with its own README covering install, build and connection.
+
+**It has never been compiled.** This machine has no JDK, no Android SDK, no
+Gradle and no Android Studio, so nothing in that folder has been through a
+compiler or onto a device. Every XML file is checked well-formed and every
+`R.` reference is checked to resolve, which catches typos and is not a build.
+Do not tell a panel the app works until someone has run it.
+
+The wrapper exists to supply the five things a bare WebView does not, each of
+which silently breaks a feature the capstone is assessed on:
+
+1. **`CookieManager.flush()` in `onPause()`.** Without it the `eduflex_browser`
+   cookie never reaches disk, so the seven-day trust is lost on every launch
+   and email verification comes back. That is the bug fixed on 2 November,
+   reintroduced by the wrapper, and it would look like a new defect.
+2. **`onShowFileChooser`.** Without it Upload Material does nothing at all.
+3. **Extension to MIME mapping.** EduFlex writes `accept=".pdf,.docx,.txt,.md"`,
+   and Android's `EXTRA_MIME_TYPES` understands only MIME types. Hand it
+   `.pdf` and the picker greys out every document, with no error.
+4. **`DownloadListener`.** Without it Export my data does nothing, and that is
+   the withdrawal mechanism Chapter III cites.
+5. **`tel:` and `mailto:` handoff**, or the Who to Contact block is dead text.
+
+**Cleartext HTTP is permitted on purpose**, in
+`res/xml/network_security_config.xml`. Android 9+ blocks it by default and the
+WebView then renders nothing with no stated reason. That file says what to
+delete once HTTPS is in place (Still to do, item 3).
+
+**No dependencies at all**, not even AndroidX: framework `Activity`,
+`AlertDialog` and `WebView` only, so Gradle downloads the plugin and nothing
+else. Deliberate, because large downloads time out on this connection.
+
+**The connection is the part that fails on the day.** `adb reverse tcp:8080
+tcp:80` over USB is the one to rehearse, because it needs no network at all,
+and it does not survive unplugging the cable. The address is a runtime setting
+rather than a compiled constant, so moving between USB, wifi and the emulator
+does not mean rebuilding.
 
 ## The sideways scroll on the landing page
 
