@@ -3,12 +3,14 @@
 A WebView over the same pages Apache already serves. Written 18 November 2026,
 for the final oral defense of 4 to 12 December 2026.
 
-**This project has not been compiled.** It was written on a machine with no
-JDK, no Android SDK, no Gradle and no Android Studio, so nothing here has been
-through a compiler or run on a device. Every XML file is checked well-formed
-and every `R.` reference is checked to resolve, which catches typos but is not
-the same as a build. Budget an hour for the first build and do it well before
-December, not on the day.
+**Status: built and running.** First successful build 18 November 2026, on the
+Android Studio emulator (`sdk_gphone64_x86_64`, API level as shipped with
+Studio). The landing page renders correctly, with no sideways scroll.
+
+Still not done: never installed on a **physical** handset, and the upload,
+download, `tel:` and fullscreen-video paths have not been exercised on a
+device. They are written and commented but unproven. Do not claim them until
+someone has tapped them.
 
 ---
 
@@ -121,8 +123,43 @@ Two things usually block this:
 
 ### Option C: emulator
 
-`http://10.0.2.2/eduflex-ui/`, which is how the emulator addresses its host. No
-cable, no wifi, but a slower demo and it is not a real phone in a panel's hand.
+Two addresses work, and this is where the first run actually tripped up.
+
+- **`http://10.0.2.2/eduflex-ui/`** is the emulator's built-in alias for the
+  host machine. Nothing to set up.
+- **`http://localhost:8080/eduflex-ui/`** also works, but only after
+  `adb reverse tcp:8080 tcp:80`, exactly as on a real phone. Worth using for
+  that reason: it rehearses the thing you will do on the day.
+
+No cable and no wifi needed either way, but it is not a real phone in a
+panel's hand, so test on hardware before December.
+
+---
+
+## 4a. If the app says "Cannot reach EduFlex"
+
+Read the error, it names the address the app is using. Then work down this
+list. The first run failed at step 2 and nothing else.
+
+1. **Is Apache up?** XAMPP Control Panel, Apache should say Running. Confirm
+   from the laptop itself by opening `http://localhost/eduflex-ui/index.php`.
+2. **`net::ERR_CONNECTION_REFUSED` means `adb reverse` is not set.** Refused is
+   not the same as timed out: something answered and said nothing is listening
+   on that port, which is what the phone's own `localhost:8080` looks like
+   before the bridge exists. Run it again:
+
+   ```powershell
+   & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" reverse tcp:8080 tcp:80
+   & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" reverse --list
+   ```
+
+   The second command should print `tcp:8080 tcp:80`. **The bridge does not
+   survive unplugging the cable, and it does not survive restarting the
+   emulator either.** Re-running it is the fix, every time.
+3. **A timeout rather than a refusal** points the other way: the address is
+   reachable but something is dropping the packets. On wifi that is Windows
+   Firewall on port 80, or XAMPP listening on `127.0.0.1` only.
+4. **Change the address** from the menu, top right. No rebuild needed.
 
 ---
 
@@ -176,7 +213,9 @@ types. Passing `.pdf` through matches nothing, with no error anywhere.
 Stated plainly, because the panel may ask and you need to know what you can
 claim.
 
-1. **Never compiled or run.** See the top of this file.
+1. **Only ever run on the emulator**, not on a physical handset. The upload,
+   download, `tel:` and fullscreen-video paths are written but untested on a
+   device. See the top of this file.
 2. **No offline mode.** Close the laptop and the app shows the "Cannot reach
    EduFlex" page. Caching pages would mean caching a learner's material on the
    handset, which is a privacy question `privacy.php` does not currently cover,

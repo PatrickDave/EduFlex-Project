@@ -748,11 +748,19 @@ text. That is a genuine improvement and a cosmetic one; it was not done.
 Built 18 November 2026, when Patrick chose a WebView APK over a PWA. Lives in
 `android/`, with its own README covering install, build and connection.
 
-**It has never been compiled.** This machine has no JDK, no Android SDK, no
-Gradle and no Android Studio, so nothing in that folder has been through a
-compiler or onto a device. Every XML file is checked well-formed and every
-`R.` reference is checked to resolve, which catches typos and is not a build.
-Do not tell a panel the app works until someone has run it.
+**Built and running on the emulator, 18 November 2026.** The landing page
+renders correctly with no sideways scroll. It has NOT been on a physical
+handset, and upload, download, `tel:` and fullscreen video are written but
+never tapped on a device. Do not claim those until someone has.
+
+**The first run failed with `net::ERR_CONNECTION_REFUSED`, and the cause was
+`adb reverse` not being set.** Worth knowing because refused and timed out
+mean different things: refused is something answering to say nothing listens
+on that port, which is the phone's own `localhost:8080` before the bridge
+exists. A timeout instead points at the firewall or at XAMPP bound to
+`127.0.0.1`. **The bridge survives neither unplugging the cable nor restarting
+the emulator**, so re-running it is a step, not a one-off. On the emulator
+`http://10.0.2.2/eduflex-ui/` needs no bridge at all.
 
 The wrapper exists to supply the five things a bare WebView does not, each of
 which silently breaks a feature the capstone is assessed on:
