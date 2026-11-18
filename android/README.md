@@ -64,8 +64,25 @@ confirm **Android 14 (API 34)** is ticked, because that is what
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Copy that to the phone and open it. Android will ask you to allow installing
-from unknown sources, which is normal for an app that did not come from Play.
+### Getting the APK onto the phone
+
+No cable needed. XAMPP is already a web server, so let it serve the APK:
+
+```powershell
+Copy-Item "C:\xampp\htdocs\eduflex-ui\android\app\build\outputs\apk\debug\app-debug.apk" `
+          "C:\xampp\htdocs\eduflex.apk" -Force
+```
+
+Then open `http://<laptop-ip>/eduflex.apk` in the phone's browser. Apache sends
+it as `application/vnd.android.package-archive`, so Chrome offers to install it
+rather than saving a file you then have to find.
+
+Android will ask you to allow installing from unknown sources, which is normal
+for an app that did not come from Play.
+
+Delete `C:\xampp\htdocs\eduflex.apk` afterwards. Nothing breaks if you leave
+it, but it is a copy that goes stale the moment you rebuild, and installing a
+stale one while thinking it is current wastes an afternoon.
 
 ### If you want a release build
 
