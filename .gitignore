@@ -8,6 +8,15 @@ storage/uploads/*
 !storage/uploads/.gitkeep
 storage/backups/
 
+# Profile pictures. Participant photographs, so this is a privacy line and not
+# a tidiness one: without it a `git add -A` publishes a real person's face to a
+# public repository, and git history makes that hard to take back. Found on
+# 18 November 2026 with one real photo already sitting untracked.
+#
+# No .gitkeep needed; avatar_store() in includes/avatar.php creates the
+# directory on first upload.
+storage/avatars/
+
 # The manuscript. Large, not source code, and Chapter IV may carry participant
 # data. The landing page content taken from it lives in includes/manuscript.php,
 # which IS committed; that file is the interface between the two.
