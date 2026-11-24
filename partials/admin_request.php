@@ -22,13 +22,18 @@ $status       = (string) ($r['status'] ?? 'open');
 $statusFilter = $statusFilter ?? '';
 $typeFilter   = $typeFilter ?? '';
 $showActions  = $showActions ?? true;
+$replyCount   = (int) ($r['reply_count'] ?? 0);
+$needsReply   = admin_needs_reply($r);
+$threadHref   = 'admin_thread.php?id=' . (int) $r['request_id'];
 ?>
 <section class="ef-card ef-admin-req">
 
   <div class="ef-admin-req-head">
     <div style="min-width:0;">
       <div class="ef-card-title" style="margin-bottom:4px;">
-        #<?= (int) $r['request_id'] ?> &middot; <?= e((string) $r['subject']) ?>
+        <a class="ef-admin-req-link" href="<?= e($threadHref) ?>">
+          #<?= (int) $r['request_id'] ?> &middot; <?= e((string) $r['subject']) ?>
+        </a>
       </div>
       <div class="ef-second" style="font-size:12.5px;">
         <?= e((string) $r['full_name']) ?>
@@ -36,9 +41,14 @@ $showActions  = $showActions ?? true;
         &middot; <?= e((string) $r['created_at']) ?>
       </div>
     </div>
-    <span class="ef-band ef-band-<?= e(support_status_band($status)) ?>">
-      <?= e(support_status_label($status)) ?>
-    </span>
+    <div class="ef-admin-req-pills">
+      <?php if ($needsReply): ?>
+        <span class="ef-reply-flag"><?= $replyCount === 0 ? 'Needs a reply' : 'Learner replied' ?></span>
+      <?php endif; ?>
+      <span class="ef-band ef-band-<?= e(support_status_band($status)) ?>">
+        <?= e(support_status_label($status)) ?>
+      </span>
+    </div>
   </div>
 
   <div class="ef-admin-req-type">
@@ -46,6 +56,17 @@ $showActions  = $showActions ?? true;
   </div>
 
   <p class="ef-admin-req-body"><?= nl2br(e((string) $r['message'])) ?></p>
+
+  <div class="ef-admin-req-thread">
+    <span class="ef-second">
+      <?= $replyCount === 0
+            ? 'No replies yet'
+            : $replyCount . ' ' . ($replyCount === 1 ? 'reply' : 'replies') ?>
+    </span>
+    <a class="ef-btn ef-btn-primary ef-btn-sm" href="<?= e($threadHref) ?>">
+      <?= $replyCount === 0 ? 'Reply' : 'Open conversation' ?>
+    </a>
+  </div>
 
   <?php if ($showActions): ?>
     <div class="ef-admin-req-actions">

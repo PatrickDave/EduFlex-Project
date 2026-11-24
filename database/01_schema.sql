@@ -151,6 +151,35 @@ CREATE TABLE support_request (
 
 
 -- ---------------------------------------------------------------------------
+-- SUPPORT REPLY  (ADDED 2026-11-19, not in the Chapter III data dictionary)
+--
+-- The conversation under one support request: the project team's replies and
+-- the learner's answers to them. The request's own message stays in
+-- support_request and is the first message of the thread.
+--
+-- from_team is recorded at the moment of writing rather than worked out later
+-- from user.is_admin, so the history stays truthful if a team account is later
+-- revoked. author_id goes NULL when its account is deleted; the reply stays, so
+-- the learner still sees what they were told. Deleting the request (or the
+-- learner who sent it) removes the whole thread. See SCHEMA-NOTES.md section 11.
+-- ---------------------------------------------------------------------------
+CREATE TABLE support_reply (
+  reply_id     INT(11)      NOT NULL AUTO_INCREMENT,
+  request_id   INT(11)      NOT NULL,
+  author_id    INT(11)      NULL,
+  from_team    TINYINT(1)   NOT NULL DEFAULT 0,
+  message      TEXT         NOT NULL,
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (reply_id),
+  KEY idx_reply_request (request_id, reply_id),
+  CONSTRAINT fk_reply_request FOREIGN KEY (request_id)
+    REFERENCES support_request (request_id) ON DELETE CASCADE,
+  CONSTRAINT fk_reply_author FOREIGN KEY (author_id)
+    REFERENCES user (user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- ---------------------------------------------------------------------------
 -- RESOURCE CHUNK  (ADDED — not in the Chapter III data dictionary)
 --
 -- Extraction turns an upload into plain text, which is then split into

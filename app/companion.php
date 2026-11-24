@@ -39,6 +39,22 @@ if ($user !== null
     && !str_starts_with($active, 'admin')) {
     redirect('admin.php');
 }
+
+/* The "Login Successful" welcome, once, on the first page after signing in.
+   includes/auth.php sets the marker in auth_complete_login(), which only a
+   successful sign-in reaches. Read and cleared here so a refresh does not
+   replay it. Learners and the team both see it (the team since 24 November
+   2026, at Patrick's request), each with its own message: see
+   partials/login_welcome.php. A learner who tries the admin door is signed
+   out by admin_login.php, which destroys the session and the marker with it,
+   so this never plays for a refused sign-in on either door. */
+$loginWelcome = false;
+$loginWelcomeTeam = false;
+if (isset($_SESSION['_login_welcome'])) {
+    unset($_SESSION['_login_welcome']);
+    $loginWelcome = $user !== null;
+    $loginWelcomeTeam = $loginWelcome && admin_is_admin($user);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -49,7 +65,9 @@ if ($user !== null
 <link href="../assets/vendor/bootstrap-5.3.3.min.css" rel="stylesheet">
 <link href="<?= asset('../assets/css/eduflex.css') ?>" rel="stylesheet">
 </head>
-<body>
+<body<?= $loginWelcome ? ' class="ef-entering"' : '' ?>>
+
+<?php if ($loginWelcome): include __DIR__ . '/../partials/login_welcome.php'; endif; ?>
 
 <div class="ef-shell">
 
@@ -113,7 +131,11 @@ $flashError = flash_get('error');
             <div class="ef-alert ef-alert-error"><?= e((string) $flashError) ?></div>
           <?php endif; ?>
 
-          <div class="ef-thread" style="flex:1 1 auto;overflow-y:auto;" data-thread>
+          <?php /* The wrapper gives the floating scroll buttons a corner of the
+                   conversation to sit in (20 November 2026). It takes over the
+                   thread's place in the column; the thread still scrolls. */ ?>
+          <div class="ef-thread-wrap">
+          <div class="ef-thread" style="flex:1 1 auto;overflow-y:auto;min-height:0;" data-thread>
             <div class="ef-msg ef-msg-ai">
               <span class="ef-msg-avatar"></span>
               <div class="ef-bubble ef-bubble-ai">
@@ -146,6 +168,24 @@ $flashError = flash_get('error');
               </div>
             <?php endforeach; ?>
           </div>
+
+            <div class="ef-scroll-btns">
+              <button type="button" class="ef-scroll-btn" data-scroll-top
+                      aria-label="Scroll to the start of the conversation" title="Back to top">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 12.5V3.5M3.8 7.7 8 3.5l4.2 4.2" stroke="currentColor"
+                        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button type="button" class="ef-scroll-btn ef-scroll-btn-latest" data-scroll-latest
+                      aria-label="Scroll to the latest message" title="Jump to latest">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 3.5v9M3.8 8.3 8 12.5l4.2-4.2" stroke="currentColor"
+                        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div><!-- /.ef-thread-wrap -->
 
           <?php if ($active): ?>
             <div style="display:flex;gap:10px;flex-wrap:wrap;" data-suggestions>
@@ -341,6 +381,45 @@ $flashError = flash_get('error');
         }
 
         function esc(s) { return $('<div>').text(s == null ? '' : s).html(); }
+
+        /* ---- scroll buttons (20 November 2026) ----
+           "Jump to latest" shows once the reader has scrolled up away from the
+           newest message; "Back to top" once they are well into a long
+           conversation. Each hides itself when it would do nothing. */
+        var $toLatest = $('[data-scroll-latest]');
+        var $toTop = $('[data-scroll-top]');
+        var smoothScroll = !(window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        var scrollQueued = false;
+
+        function updateScrollButtons() {
+          scrollQueued = false;
+          var el = $thread[0];
+          if (!el) { return; }
+          var fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+          $toLatest.toggleClass('is-visible', fromBottom > 160);
+          $toTop.toggleClass('is-visible', el.scrollTop > 400);
+        }
+        function queueScrollButtons() {
+          if (scrollQueued) { return; }
+          scrollQueued = true;
+          window.requestAnimationFrame(updateScrollButtons);
+        }
+        function scrollThreadTo(top) {
+          var el = $thread[0];
+          if (!el) { return; }
+          if (el.scrollTo) {
+            el.scrollTo({ top: top, behavior: smoothScroll ? 'smooth' : 'auto' });
+          } else {
+            el.scrollTop = top;
+          }
+        }
+
+        $thread.on('scroll', queueScrollButtons);
+        $(window).on('resize', queueScrollButtons);
+        $toLatest.on('click', function () { scrollThreadTo($thread[0].scrollHeight); });
+        $toTop.on('click', function () { scrollThreadTo(0); });
+        updateScrollButtons();
 
         /* ---- asking the companion ---- */
 

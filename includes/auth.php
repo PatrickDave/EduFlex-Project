@@ -285,7 +285,10 @@ function auth_login(string $email, string $password): array
         // Counted too: this branch confirms the account exists, so it must not
         // be an unlimited probe.
         login_throttle_record_failure($email, $ip);
-        return ['ok' => false, 'errors' => ['form' => 'This account is not active. Contact support.']];
+        // "Contact support" used to send them to a page that needs a sign-in.
+        // The project team's contact details are public on privacy.php.
+        return ['ok' => false, 'errors' => ['form' => 'This account has been deactivated. '
+            . 'Contact the project team (see the Privacy page) if you think this is a mistake.']];
     }
 
     // Rehash if PHP's default cost or algorithm has moved on.
@@ -329,6 +332,16 @@ function auth_complete_login(array $user): void
     $_SESSION['_credential_hash'] = verification_credential($user);
     $_SESSION['_email_grace_until'] = email_verification_enabled()
         ? trusted_browser_expiry($user) : 0;
+
+    /* One-time marker for the "Login Successful" animation, added 20 November
+       2026. Set HERE and nowhere else, because this is the only place a sign-in
+       becomes real: after the password, after any emailed code, after the
+       account is confirmed active. A failed login never reaches this line, so
+       it can never be shown the success screen. The first learner page
+       rendered afterwards reads and clears it (see SHELL in build_pages.py);
+       admin pages clear it without showing anything. It is a session flag, not
+       a database write, so rule 8 (no write on render) is not touched. */
+    $_SESSION['_login_welcome'] = 1;
 
     /* A learner who mistyped four times and then got it right is not punished.
        Pruning here rather than on a schedule keeps the table small without a
@@ -512,6 +525,20 @@ function auth_user(): ?array
     // The session points at a user who no longer exists. Clear it.
     if (!$row) {
         auth_logout();
+        return null;
+    }
+
+    /* A deactivated account is signed out on its very next request.
+
+       auth_login() already refuses an inactive account, but that only stops a
+       NEW sign-in. Until 19 November 2026 the only check on a live session was
+       inside auth_is_logged_in(), and only when email verification is on, so
+       with it off a learner the team deactivated kept working until they
+       signed out themselves. Checked here because every gated page and every
+       action endpoint goes through auth_user(). */
+    if ((string) $row['account_status'] !== 'active') {
+        auth_logout();
+        flash_set('error', 'This account has been deactivated. Contact the project team if you think this is a mistake.');
         return null;
     }
 
@@ -761,6 +788,26 @@ function auth_export_data(int $userId): array
         [$userId]
     );
 
+    /* Support requests and every reply on them, including the team's: what the
+       team said to a learner is part of that learner's record. The team
+       member's name is left out; the export says "project team" instead. */
+    $supportRequests = $rows(
+        'SELECT request_id, request_type, subject, message, status, created_at
+           FROM support_request WHERE user_id = ? ORDER BY request_id ASC',
+        [$userId]
+    );
+
+    $supportReplies = $rows(
+        "SELECT r.reply_id, r.request_id,
+                CASE WHEN r.from_team = 1 THEN 'project team' ELSE 'you' END AS author,
+                r.message, r.created_at
+           FROM support_reply r
+           JOIN support_request sr ON sr.request_id = r.request_id
+          WHERE sr.user_id = ?
+       ORDER BY r.reply_id ASC",
+        [$userId]
+    );
+
     return [
         'exported_at' => date('c'),
         'system'      => 'EduFlex, a BSIT capstone prototype at the University of Cebu Main',
@@ -774,6 +821,8 @@ function auth_export_data(int $userId): array
         'topics'      => $topics,
         'attempts'    => $attempts,
         'answers'     => $responses,
+        'support_requests' => $supportRequests,
+        'support_replies'  => $supportReplies,
     ];
 }
 

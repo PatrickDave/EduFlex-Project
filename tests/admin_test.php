@@ -44,12 +44,22 @@ CREATE TABLE user (
   account_status TEXT NOT NULL DEFAULT 'active',
   is_admin INTEGER NOT NULL DEFAULT 0,
   email_verified_at TEXT NULL,
+  program TEXT NOT NULL DEFAULT 'BS Information Technology',
+  year_level INTEGER NOT NULL DEFAULT 1,
+  avatar_path TEXT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE trusted_browser (token_hash TEXT, user_id INTEGER);
+CREATE TABLE email_verification (user_id INTEGER);
 CREATE TABLE support_request (
   request_id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL, request_type TEXT NOT NULL,
   subject TEXT NOT NULL, message TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE support_reply (
+  reply_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL, author_id INTEGER NULL,
+  from_team INTEGER NOT NULL DEFAULT 0, message TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE learning_resource (
   resource_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
@@ -935,6 +945,373 @@ check('and the scan would actually catch one if it existed', (function () {
     $code = php_strip_whitespace($tmp);
     @unlink($tmp);
     return (bool) preg_match('/UPDATE\s+user\s+SET[^;]*is_admin/i', $code);
+})());
+
+/* ------------------------------------------------------ replying to learners */
+
+/* 19 November 2026. The team can now answer a request, not just move its
+   status. Request 1 is learner 2's open bug report; patrick (user 1) is the
+   team account. */
+
+section('The team replies');
+
+$pdo->exec('DELETE FROM notification');
+$pdo->exec('DELETE FROM support_reply');
+$pdo->exec("UPDATE support_request SET status = 'open' WHERE request_id = 1");
+
+check('an untouched open request needs a reply', admin_needs_reply(admin_request(1)));
+
+$r = admin_reply(1, 1, 'Thanks. Which browser were you using?');
+check('the reply is accepted',                 $r['ok'] === true && $r['error'] === null);
+check('replying to an open request starts it', $r['status'] === 'in_progress'
+    && (string) admin_request(1)['status'] === 'in_progress');
+check('the reply is stored as the team\'s', (function () {
+    $rows = support_replies(1);
+    return count($rows) === 1 && (int) $rows[0]['from_team'] === 1
+        && (int) $rows[0]['author_id'] === 1;
+})());
+check('the queue row counts it', (int) admin_request(1)['reply_count'] === 1);
+check('and the next move is now the learner\'s', !admin_needs_reply(admin_request(1)));
+
+check('the learner is told, exactly once', (int) $pdo->query(
+    "SELECT COUNT(*) FROM notification WHERE user_id = 2 AND notification_type = 'support'")
+    ->fetchColumn() === 1);
+check('the notification quotes the reply', (function () use ($pdo) {
+    $msg = (string) $pdo->query("SELECT message FROM notification WHERE user_id = 2")->fetchColumn();
+    return str_contains($msg, 'Which browser') && str_contains($msg, 'Upload fails');
+})());
+check('nobody else is told anything', (int) $pdo->query(
+    "SELECT COUNT(*) FROM notification WHERE user_id <> 2")->fetchColumn() === 0);
+
+section('The learner answers, and it comes back to the team');
+
+support_learner_reply(2, 1, 'Chrome, on Windows.');
+check('a learner reply puts it back on the team', admin_needs_reply(admin_request(1)));
+check('the team is not sent a notification for it', (int) $pdo->query(
+    'SELECT COUNT(*) FROM notification WHERE user_id = 1')->fetchColumn() === 0);
+check('the count of requests needing a reply includes it', admin_needs_reply_count() >= 1);
+
+section('Reply and resolve in one step');
+
+$pdo->exec('DELETE FROM notification');
+$r = admin_reply(1, 1, 'Fixed in the latest version. Please try again.', true);
+check('it is resolved',  $r['ok'] && (string) admin_request(1)['status'] === 'resolved');
+check('a resolved request no longer needs a reply', !admin_needs_reply(admin_request(1)));
+check('the learner gets ONE notification, not one per change', (int) $pdo->query(
+    'SELECT COUNT(*) FROM notification WHERE user_id = 2')->fetchColumn() === 1);
+check('and it says the request is resolved', str_contains(
+    (string) $pdo->query('SELECT message FROM notification WHERE user_id = 2')->fetchColumn(),
+    'Resolved'));
+
+section('What the team cannot do');
+
+$before = (int) $pdo->query('SELECT COUNT(*) FROM support_reply')->fetchColumn();
+check('an empty reply is refused',     admin_reply(1, 1, '   ')['ok'] === false);
+check('an oversized reply is refused',
+    admin_reply(1, 1, str_repeat('x', SUPPORT_MESSAGE_MAX + 1))['ok'] === false);
+check('a reply to a missing request is refused',
+    admin_reply(1, 9999, 'Hello there.')['ok'] === false);
+check('and it says so without a status', admin_reply(1, 9999, 'Hello there.')['status'] === '');
+check('none of those wrote anything',
+    (int) $pdo->query('SELECT COUNT(*) FROM support_reply')->fetchColumn() === $before);
+
+$pdo->exec("UPDATE support_request SET status = 'closed' WHERE request_id = 3");
+check('the team CAN still write on a closed request',
+    // Closing is the team's call; saying a last word after it is too.
+    admin_reply(1, 3, 'Closing this, thank you for the suggestion.')['ok'] === true);
+check('and that does not reopen it', (string) admin_request(3)['status'] === 'closed');
+
+section('Needs a reply, case by case');
+
+check('nothing closed or resolved ever needs one', !admin_needs_reply(
+    ['status' => 'resolved', 'reply_count' => 0, 'last_from_team' => null])
+    && !admin_needs_reply(['status' => 'closed', 'reply_count' => 3, 'last_from_team' => 0]));
+check('open with no replies does',
+    admin_needs_reply(['status' => 'open', 'reply_count' => 0, 'last_from_team' => null]));
+check('in progress, learner spoke last, does',
+    admin_needs_reply(['status' => 'in_progress', 'reply_count' => 2, 'last_from_team' => '0']));
+check('in progress, team spoke last, does not',
+    // MySQL returns "1", SQLite 1. Both must read as the team.
+    !admin_needs_reply(['status' => 'in_progress', 'reply_count' => 2, 'last_from_team' => '1'])
+    && !admin_needs_reply(['status' => 'in_progress', 'reply_count' => 2, 'last_from_team' => 1]));
+
+section('The reply door is locked too');
+
+$replyAction = (string) file_get_contents(__DIR__ . '/../app/actions/admin_reply.php');
+$statusAction = (string) file_get_contents(__DIR__ . '/../app/actions/admin_status.php');
+
+check('the reply action calls admin_require()', str_contains($replyAction, 'admin_require()'));
+check('before it reads anything from the POST', (function () use ($replyAction) {
+    $gate = strpos($replyAction, 'admin_require()');
+    $post = strpos($replyAction, '$_POST');
+    return $gate !== false && $post !== false && $gate < $post;
+})());
+check('it refuses anything but POST', str_contains($replyAction, "REQUEST_METHOD'] !== 'POST'"));
+check('it checks CSRF',               str_contains($replyAction, 'csrf_check('));
+check('the author is the signed-in admin, never a form field',
+    str_contains($replyAction, "auth_user()['user_id']") && !str_contains($replyAction, "\$_POST['user_id']"));
+check('it redirects only to a page built from an integer id',
+    // No "back" field at all, so there is nothing to turn into an open redirect.
+    !str_contains($replyAction, "\$_POST['back']")
+    && str_contains($replyAction, "(int) (\$_POST['request_id']"));
+check('the status action may return to the conversation page',
+    str_contains($statusAction, "'admin_thread.php'"));
+check('and builds that return from the cast id, not the POST',
+    str_contains($statusAction, "['id' => \$requestId]"));
+
+check('the conversation page is gated before any output', (function () {
+    $src  = (string) @file_get_contents(__DIR__ . '/../app/admin_thread.php');
+    $gate = strpos($src, 'admin_require()');
+    $html = strpos($src, '<!DOCTYPE html>');
+    return $gate !== false && $html !== false && $gate < $html;
+})());
+check('build_pages.py is its source', (function () {
+    $build = (string) file_get_contents(__DIR__ . '/../build_pages.py');
+    return str_contains($build, '"admin_thread.php"');
+})());
+check('it uses the help desk nav, not the learner one', (function () {
+    // An active key not starting with "admin" would send the team account to
+    // admin.php from the SHELL guard, and the page could never be reached.
+    $build = (string) file_get_contents(__DIR__ . '/../build_pages.py');
+    return (bool) preg_match('/\("admin_thread\.php",\s*"[^"]+",\s*"admin/', $build);
+})());
+
+section('Both sides render the same thread');
+
+check('the conversation is one partial, included by both pages', (function () {
+    $a = (string) @file_get_contents(__DIR__ . '/../app/admin_thread.php');
+    $l = (string) @file_get_contents(__DIR__ . '/../app/support_thread.php');
+    return str_contains($a, 'partials/support_thread.php')
+        && str_contains($l, 'partials/support_thread.php');
+})());
+check('the support thread does not borrow the companion\'s class names', (function () {
+    // 20 November 2026: the support partial used .ef-thread and .ef-msg, which
+    // the AI companion already owns. The support styles leaked into the chat:
+    // every message got a white bordered box and the learner's own questions
+    // moved to the left. Renamed to .ef-conv / .ef-conv-msg.
+    $p = (string) file_get_contents(__DIR__ . '/../partials/support_thread.php');
+    return !preg_match('/class="ef-thread"|class="ef-msg[\s"<-]/', $p)
+        && str_contains($p, 'class="ef-conv"');
+})());
+
+check('the partial escapes every message', (function () {
+    $p = (string) file_get_contents(__DIR__ . '/../partials/support_thread.php');
+    return str_contains($p, "nl2br(e((string) \$m['message']))") && !str_contains($p, '<?= $m[');
+})());
+
+check('a reply survives as data, not markup', (function () {
+    admin_reply(1, 2, '<script>alert(1)</script> & done');
+    $rows = support_replies(2);
+    $last = end($rows);
+    return (string) $last['message'] === '<script>alert(1)</script> & done'
+        && e((string) $last['message']) === '&lt;script&gt;alert(1)&lt;/script&gt; &amp; done';
+})());
+
+/* ----------------------------------------------------- manage user accounts */
+
+/* 19 November 2026. Users so far: 1 Patrick (team), 2 A Learner, 3 Another.
+   Two more are added here so search and the filters have something to tell
+   apart. */
+
+$pdo->exec("INSERT INTO user (full_name, email, is_admin, account_status, email_verified_at) VALUES
+  ('Maria Santos',   'maria@example.com',   0, 'active',   '2026-11-01 08:00:00'),
+  ('Juan Dela Cruz', 'juan_50%@example.com', 0, 'inactive', NULL)");
+$pdo->exec("UPDATE user SET email_verified_at = '2026-11-01 08:00:00' WHERE user_id IN (1, 2)");
+
+$ids = static fn(array $rows): array => array_map(static fn(array $r): int => (int) $r['user_id'], $rows);
+
+section('Viewing and searching accounts');
+
+check('every account is listed, team included', count(admin_accounts()) === 5);
+check('newest first by default', $ids(admin_accounts())[0] === 5);
+check('oldest first when asked', $ids(admin_accounts('', '', '', '', 'oldest'))[0] === 1);
+check('by name when asked', (string) admin_accounts('', '', '', '', 'name')[0]['full_name'] === 'A Learner');
+check('an unknown sort falls back to newest, not to the URL',
+    $ids(admin_accounts('', '', '', '', 'user_id; DROP TABLE user'))[0] === 5);
+
+check('search matches part of a name', $ids(admin_accounts('santos')) === [4]);
+check('search is case-insensitive',    $ids(admin_accounts('MARIA')) === [4]);
+check('search matches an email',       $ids(admin_accounts('other@')) === [3]);
+check('a number also matches the user id', in_array(2, $ids(admin_accounts('2')), true));
+check('a search with no match returns nothing', admin_accounts('nobody-at-all') === []);
+check('a literal % is searched for, not used as a wildcard',
+    // Without escaping, "50%" would match anything containing "50".
+    $ids(admin_accounts('50%')) === [5]);
+check('a literal _ is too', $ids(admin_accounts('n_5')) === [5]);
+check('a quote in the search is just text', admin_accounts("o'brien") === []);
+
+section('Filtering accounts');
+
+check('active only',      !in_array(5, $ids(admin_accounts('', 'active')), true)
+                          && count(admin_accounts('', 'active')) === 4);
+check('deactivated only', $ids(admin_accounts('', 'inactive')) === [5]);
+check('verified only',    count(admin_accounts('', '', 'yes')) === 3);
+check('not verified only', $ids(admin_accounts('', '', 'no', '', 'oldest')) === [3, 5]);
+check('team only',        $ids(admin_accounts('', '', '', 'team')) === [1]);
+check('learners only',    !in_array(1, $ids(admin_accounts('', '', '', 'learner')), true));
+check('filters combine',  $ids(admin_accounts('juan', 'inactive', 'no', 'learner')) === [5]);
+check('an unknown filter value is ignored, not trusted',
+    count(admin_accounts('', 'banned', 'maybe', 'root')) === 5);
+check('each row carries its activity counts', (function () {
+    $row = admin_accounts('learner@')[0];
+    return array_key_exists('materials', $row) && array_key_exists('requests', $row)
+        && (int) $row['requests'] === 2;
+})());
+
+$sum = admin_account_summary();
+check('the summary counts every account', $sum['total'] === 5);
+check('and splits active from deactivated', $sum['active'] === 4 && $sum['inactive'] === 1);
+check('and counts the unverified and the team', $sum['unverified'] === 2 && $sum['team'] === 1);
+
+section('Viewing one account');
+
+check('a learner\'s details load', (admin_account(4)['email'] ?? null) === 'maria@example.com');
+check('a team account\'s details load too, for viewing', (int) (admin_account(1)['is_admin'] ?? 0) === 1);
+check('a missing account is null', admin_account(999) === null);
+check('their support requests are listed', count(admin_account_requests(2)) === 2);
+check('and nobody else\'s', admin_account_requests(4) === []);
+check('the password hash is never selected', !array_key_exists('password_hash', admin_account(2) ?? []));
+
+section('Editing an account');
+
+$pdo->exec('DELETE FROM notification');
+$r = admin_update_account(4, '  Maria L. Santos ', 'maria@example.com', 'BS Computer Science', 3);
+check('a valid edit is saved', $r['ok'] && $r['changed'] && !$r['email_changed']);
+check('the values are stored, trimmed', (function () {
+    $a = admin_account(4);
+    return $a['full_name'] === 'Maria L. Santos' && $a['program'] === 'BS Computer Science'
+        && (int) $a['year_level'] === 3;
+})());
+check('an unchanged email keeps its verification', admin_account(4)['email_verified_at'] !== null);
+check('the learner is notified of the change', (int) $pdo->query(
+    'SELECT COUNT(*) FROM notification WHERE user_id = 4')->fetchColumn() === 1);
+
+$pdo->exec('DELETE FROM notification');
+$r = admin_update_account(4, 'Maria L. Santos', 'maria@example.com', 'BS Computer Science', 3);
+check('saving with nothing changed writes nothing', $r['ok'] && !$r['changed']);
+check('and notifies nobody', (int) $pdo->query('SELECT COUNT(*) FROM notification')->fetchColumn() === 0);
+
+$r = admin_update_account(4, 'Maria L. Santos', 'MARIA.NEW@Example.com', 'BS Computer Science', 3);
+check('an email change is saved, lower-cased', $r['ok'] && $r['email_changed']
+    && admin_account(4)['email'] === 'maria.new@example.com');
+check('and clears the verification, so the new address must be proved',
+    admin_account(4)['email_verified_at'] === null);
+
+check('a taken email is refused', admin_update_account(4, 'Maria', 'learner@example.com', 'BSIT', 1)
+    ['errors']['email'] === 'Another account already uses that email address.');
+check('an invalid email is refused', isset(admin_update_account(4, 'Maria', 'not-an-email', 'BSIT', 1)['errors']['email']));
+check('an empty name is refused',    isset(admin_update_account(4, '  ', 'maria.new@example.com', 'BSIT', 1)['errors']['full_name']));
+check('an overlong name is refused',
+    isset(admin_update_account(4, str_repeat('a', 151), 'maria.new@example.com', 'BSIT', 1)['errors']['full_name']));
+check('an empty programme is refused', isset(admin_update_account(4, 'Maria', 'maria.new@example.com', '', 1)['errors']['program']));
+check('year 0 and year 6 are refused',
+    isset(admin_update_account(4, 'Maria', 'maria.new@example.com', 'BSIT', 0)['errors']['year_level'])
+    && isset(admin_update_account(4, 'Maria', 'maria.new@example.com', 'BSIT', 6)['errors']['year_level']));
+check('a refused edit changes nothing', admin_account(4)['full_name'] === 'Maria L. Santos');
+
+check('a team account cannot be edited here', (function () use ($pdo) {
+    $res = admin_update_account(1, 'Hijacked', 'evil@example.com', 'BSIT', 1);
+    return $res['ok'] === false && admin_account(1)['email'] === 'patrick@example.com';
+})());
+check('a missing account cannot be edited', admin_update_account(999, 'X', 'x@example.com', 'BSIT', 1)['ok'] === false);
+
+check('an edit inside a caller\'s transaction leaves that transaction alone', (function () use ($pdo) {
+    // 19 November 2026: it used to roll back the CALLER's transaction when its
+    // own beginTransaction() failed, so the caller's later writes committed.
+    $pdo->beginTransaction();
+    $res = admin_update_account(4, 'Inside A Transaction', 'maria.new@example.com', 'BSIT', 2);
+    $still = $pdo->inTransaction();
+    $pdo->rollBack();
+    return $res['ok'] === true && $still
+        && admin_account(4)['full_name'] === 'Maria L. Santos';
+})());
+
+section('Activating and deactivating');
+
+$pdo->exec('DELETE FROM notification');
+$r = admin_set_account_status(4, 'inactive');
+check('a learner can be deactivated', $r['ok'] && $r['changed']
+    && admin_account(4)['account_status'] === 'inactive');
+check('deactivation deletes nothing', admin_account(4) !== null);
+check('deactivation writes no notification they could not read', (int) $pdo->query(
+    'SELECT COUNT(*) FROM notification WHERE user_id = 4')->fetchColumn() === 0);
+check('deactivating twice reports no change', admin_set_account_status(4, 'inactive')['changed'] === false);
+
+$r = admin_set_account_status(4, 'active');
+check('and activated again', $r['ok'] && $r['changed'] && admin_account(4)['account_status'] === 'active');
+check('reactivation is announced', (int) $pdo->query(
+    'SELECT COUNT(*) FROM notification WHERE user_id = 4')->fetchColumn() === 1);
+
+check('a legacy status such as suspended counts as not active', (function () use ($pdo) {
+    $pdo->exec("UPDATE user SET account_status = 'suspended' WHERE user_id = 3");
+    $ok = admin_account_status_label('suspended') === 'Deactivated'
+        && in_array(3, $ids = array_map(static fn($r) => (int) $r['user_id'], admin_accounts('', 'inactive')), true)
+        && admin_set_account_status(3, 'active')['changed'] === true;
+    return $ok && admin_account(3)['account_status'] === 'active';
+})());
+
+check('a status outside the list is refused', admin_set_account_status(4, 'banned')['ok'] === false);
+check('a team account cannot be deactivated here', (function () {
+    $res = admin_set_account_status(1, 'inactive');
+    return $res['ok'] === false && admin_account(1)['account_status'] === 'active';
+})());
+check('a missing account cannot be deactivated', admin_set_account_status(999, 'inactive')['ok'] === false);
+
+section('A deactivated session does not survive');
+
+check('auth_user() checks account_status on every request', (function () {
+    // Until 19 November 2026 only auth_is_logged_in() checked it, and only
+    // with email verification on. auth_user() is on every gated path.
+    $src  = php_strip_whitespace(__DIR__ . '/../includes/auth.php');
+    $from = strpos($src, 'function auth_user');
+    $to   = strpos($src, 'function auth_require_login');
+    $body = $from !== false && $to !== false ? substr($src, $from, $to - $from) : '';
+    return str_contains($body, "account_status'] !== 'active'") && str_contains($body, 'auth_logout()');
+})());
+
+section('The account screens are locked and wired');
+
+$build   = (string) file_get_contents(__DIR__ . '/../build_pages.py');
+$sidebar = (string) file_get_contents(__DIR__ . '/../partials/sidebar.php');
+
+foreach (['admin_users.php', 'admin_user.php'] as $f) {
+    check("$f is generated and gated before any output", (function () use ($f, $build) {
+        $src  = (string) @file_get_contents(__DIR__ . '/../app/' . $f);
+        $gate = strpos($src, 'admin_require()');
+        $html = strpos($src, '<!DOCTYPE html>');
+        return str_contains($build, '"' . $f . '"') && str_contains($src, 'GENERATED FILE')
+            && $gate !== false && $html !== false && $gate < $html;
+    })());
+}
+
+foreach (['admin_user_update.php', 'admin_user_status.php', 'admin_user_delete.php', 'admin_user_export.php'] as $f) {
+    $src = (string) file_get_contents(__DIR__ . '/../app/actions/' . $f);
+    check("$f calls admin_require() before reading the POST",
+        ($g = strpos($src, 'admin_require()')) !== false && $g < strpos($src, '$_POST'));
+    check("$f requires POST and CSRF",
+        str_contains($src, "REQUEST_METHOD'] !== 'POST'") && str_contains($src, 'csrf_check('));
+    check("$f never redirects to a page named in the POST",
+        !preg_match('/redirect\(\s*\$_POST/', $src) && !str_contains($src, "\$_POST['back']"));
+}
+
+check('the sidebar shows Manage User Accounts in the help desk nav',
+    str_contains($sidebar, "'admin_users'") && str_contains($sidebar, 'Manage User Accounts'));
+check('it has its own inline icon', (bool) preg_match("/'admin_users'\s*=>\s*'<circle/", $sidebar));
+check('deactivate and delete ask for confirmation in the browser', (function () {
+    $src = (string) file_get_contents(__DIR__ . '/../app/admin_user.php');
+    return substr_count($src, 'data-confirm=') >= 2;
+})());
+check('and the confirm handler exists in eduflex.js',
+    str_contains((string) file_get_contents(__DIR__ . '/../assets/js/eduflex.js'), "form[data-confirm]"));
+check('delete still requires the typed email on the account screen',
+    str_contains((string) file_get_contents(__DIR__ . '/../app/admin_user.php'), 'name="confirm_email"'));
+check('team accounts get no edit, status or delete form', (function () {
+    // The forms sit inside the else branch of the $isTeam check.
+    $src = (string) file_get_contents(__DIR__ . '/../app/admin_user.php');
+    $team = strpos($src, '<?php if ($isTeam): ?>');
+    $else = strpos($src, '<?php else: ?>', (int) $team);
+    $form = strpos($src, 'actions/admin_user_update.php');
+    return $team !== false && $else !== false && $form > $else;
 })());
 
 echo "\n===========================\n";

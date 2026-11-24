@@ -63,6 +63,7 @@ if ($adminArea) {
         ['key' => 'admin',          'label' => 'Admin Dashboard', 'href' => 'admin.php'],
         ['key' => 'admin_requests', 'label' => 'Manage Requests', 'href' => 'admin_requests.php'],
         ['key' => 'admin_feedback', 'label' => 'Manage Feedback', 'href' => 'admin_feedback.php'],
+        ['key' => 'admin_users',    'label' => 'Manage User Accounts', 'href' => 'admin_users.php'],
     ];
     $footNav = [
         ['key' => 'admin_settings', 'label' => 'Settings', 'href' => 'admin_settings.php'],
@@ -143,6 +144,11 @@ function ef_nav_icon(string $key): string
                           . 'a1.4 1.4 0 0 1 1.4-1.4h8.2a1.4 1.4 0 0 1 1.4 1.4Z"/>'
                           . '<path d="m5.8 6.4 1.6 1.6 3-3"/>',
 
+        // Two people, one in front of the other: every account, not just one.
+        'admin_users' => '<circle cx="6.2" cy="5.4" r="2.4"/>'
+                       . '<path d="M1.8 13.4a4.4 4.4 0 0 1 8.8 0"/>'
+                       . '<path d="M10.4 3.2a2.4 2.4 0 0 1 0 4.4M12 9.6a4.4 4.4 0 0 1 2.2 3.8"/>',
+
         // A person: back to what a participant sees.
         'learner'   => '<circle cx="8" cy="5.4" r="2.6"/>'
                      . '<path d="M3 13.6a5 5 0 0 1 10 0"/>',
@@ -211,7 +217,11 @@ function ef_nav_item(array $item, string $active): string
     </form>
     <?php endif; ?>
     <?php foreach ($footNav as $item) { echo ef_nav_item($item, $active) . "\n    "; } ?>
-    <a class="ef-nav-item" href="../auth/logout.php">
+    <?php /* data-signout: eduflex.js shows a brief "Signing you out..." screen
+             before following the link. Without JavaScript it is still a plain
+             link that signs out. */ ?>
+    <a class="ef-nav-item" href="../auth/logout.php" data-signout
+       data-signout-team="<?= $adminArea ? '1' : '0' ?>">
       <?= ef_nav_icon('signout') ?><span class="ef-nav-label">Sign out</span>
     </a>
   </div>

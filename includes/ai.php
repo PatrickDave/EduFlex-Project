@@ -434,6 +434,22 @@ final class GeminiProvider extends HttpAiProvider
 
         $res = $this->post($url, $payload, ['x-goog-api-key: ' . AI_API_KEY]);
 
+        /* Some models refuse thinkingBudget 0 with a 400. Measured on
+         * gemini-3.5-flash-lite on 19 November 2026: budget 0 returns 400
+         * "Request contains an invalid argument", while thinkingLevel
+         * "minimal" returns 200 with 0 thought tokens, which is the same
+         * guarantee the comment above requires. So a 400 gets exactly one
+         * resend with the level form; every other failure is returned as is.
+         * A 400 is never retried by post(), so this costs at most one extra
+         * call, and only on a model that rejected the first form outright. */
+        if (!$res['ok'] && $res['status'] === 400) {
+            $payload['generationConfig']['thinkingConfig'] = ['thinkingLevel' => 'minimal'];
+            $retry = $this->post($url, $payload, ['x-goog-api-key: ' . AI_API_KEY]);
+            $retry['latencyMs'] += $res['latencyMs'];
+            $retry['attempts']  += $res['attempts'];
+            $res = $retry;
+        }
+
         if (!$res['ok']) {
             return AiResult::failure((string) $res['error'], $res['latencyMs'], $res['attempts']);
         }

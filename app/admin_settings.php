@@ -38,6 +38,22 @@ if ($user !== null
     && !str_starts_with($active, 'admin')) {
     redirect('admin.php');
 }
+
+/* The "Login Successful" welcome, once, on the first page after signing in.
+   includes/auth.php sets the marker in auth_complete_login(), which only a
+   successful sign-in reaches. Read and cleared here so a refresh does not
+   replay it. Learners and the team both see it (the team since 24 November
+   2026, at Patrick's request), each with its own message: see
+   partials/login_welcome.php. A learner who tries the admin door is signed
+   out by admin_login.php, which destroys the session and the marker with it,
+   so this never plays for a refused sign-in on either door. */
+$loginWelcome = false;
+$loginWelcomeTeam = false;
+if (isset($_SESSION['_login_welcome'])) {
+    unset($_SESSION['_login_welcome']);
+    $loginWelcome = $user !== null;
+    $loginWelcomeTeam = $loginWelcome && admin_is_admin($user);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -48,7 +64,9 @@ if ($user !== null
 <link href="../assets/vendor/bootstrap-5.3.3.min.css" rel="stylesheet">
 <link href="<?= asset('../assets/css/eduflex.css') ?>" rel="stylesheet">
 </head>
-<body>
+<body<?= $loginWelcome ? ' class="ef-entering"' : '' ?>>
+
+<?php if ($loginWelcome): include __DIR__ . '/../partials/login_welcome.php'; endif; ?>
 
 <div class="ef-shell">
 
@@ -185,7 +203,9 @@ $learners  = admin_users();
         <section class="ef-card ef-card-lg">
           <div class="ef-card-title" style="margin-bottom:6px;">Users</div>
           <div class="ef-card-sub" style="margin-bottom:16px;">
-            Everyone taking part, and what is stored under each account
+            Everyone taking part, and what is stored under each account.
+            To search, edit or deactivate accounts, use
+            <a href="admin_users.php">Manage User Accounts</a>.
           </div>
 
           <?php if ($usersOk): ?>
@@ -233,7 +253,7 @@ $learners  = admin_users();
                       <?php endif; ?>
                     </p>
 
-                    <form action="actions/admin_user_export.php" method="post"
+                    <form data-no-loading action="actions/admin_user_export.php" method="post"
                           style="margin:0 0 18px;">
                       <?= csrf_field() ?>
                       <input type="hidden" name="user_id" value="<?= (int) $u['user_id'] ?>">

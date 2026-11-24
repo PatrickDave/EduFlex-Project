@@ -140,3 +140,27 @@ ALTER TABLE user
 ALTER TABLE trusted_browser
   DROP PRIMARY KEY,
   ADD PRIMARY KEY (token_hash, user_id);
+
+
+-- ---------------------------------------------------------------------------
+-- 2026-11-19  Replies on support requests.
+--
+-- The team could change a request's status but could not say anything back, so
+-- a learner saw "Being looked at" and never learned what was found. One row per
+-- message under a request; the learner can answer back. Nothing is dropped.
+-- See SCHEMA-NOTES.md section 11.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS support_reply (
+  reply_id     INT(11)      NOT NULL AUTO_INCREMENT,
+  request_id   INT(11)      NOT NULL,
+  author_id    INT(11)      NULL,
+  from_team    TINYINT(1)   NOT NULL DEFAULT 0,
+  message      TEXT         NOT NULL,
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (reply_id),
+  KEY idx_reply_request (request_id, reply_id),
+  CONSTRAINT fk_reply_request FOREIGN KEY (request_id)
+    REFERENCES support_request (request_id) ON DELETE CASCADE,
+  CONSTRAINT fk_reply_author FOREIGN KEY (author_id)
+    REFERENCES user (user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

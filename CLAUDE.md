@@ -845,6 +845,136 @@ widths is what turned a two-month-old guess into a one-line fix.
 which is what the note in that suite always said to do once this was fixed. One
 width would pass again on a layout whose floor merely dropped just under 390.
 
+## Replies on support requests
+
+Added 19 November 2026. A support request is now a conversation: the team
+replies from `app/admin_thread.php`, the learner reads it and answers back on
+`app/support_thread.php`. Both include `partials/support_thread.php`, so the two
+sides cannot render a thread differently. Storage is the new `support_reply`
+table, SCHEMA-NOTES.md section 11, which is deviation 9 from Chapter III.
+
+- A team reply on an open request moves it to in progress and notifies the
+  learner once, from `admin_reply()`. "Send and mark resolved" does both in one
+  step, still one notification.
+- A learner reply on a resolved request reopens it; on a closed one it is refused.
+- The team is never notified. The bell opens a learner page that team accounts
+  are redirected away from, so the count could never be cleared. The help desk
+  shows "Needs a reply" instead, from `admin_needs_reply()`.
+
+## Manage User Accounts
+
+Added 19 November 2026: `app/admin_users.php` (search, filter, sort, counts)
+and `app/admin_user.php` (details, edit, activate/deactivate, export, delete).
+Logic is in the "Manage User Accounts" block of `includes/admin.php`.
+
+- **Team accounts are listed but never acted on.** Every write goes through
+  `admin_user()`, which returns null for `is_admin`. Team access stays with
+  `tools/make_admin.php`. No UPDATE may mention `is_admin`; the grep in
+  `tests/admin_test.php` fails the suite.
+- Deactivate stores `account_status = 'inactive'`; anything but `active` is
+  shown as Deactivated and cannot sign in. `auth_user()` now also signs out a
+  deactivated account on its next request. Before, only `auth_is_logged_in()`
+  checked, and only with email verification on, so a live session survived.
+- Delete and export reuse the existing actions and `auth_delete_account()`,
+  with the typed-email check plus a `data-confirm` prompt from `eduflex.js`.
+- Other learners' profile pictures are not shown, only initials:
+  `avatar_show.php` serves the signed-in user's own picture and nothing else.
+- **Never call a function that opens its own transaction from inside one in a
+  check script without reading it first.** `admin_update_account()` used to
+  roll back the caller's transaction, which turned a "rolled back" check
+  against the real database into real writes. Fixed; one stray notification
+  was deleted by id.
+
+## Button motion
+
+Added 20 November 2026: section 17 at the END of `eduflex.css` (it must stay
+last, or older rules with their own `transition` override it) plus the
+ripple and loading handlers at the foot of `eduflex.js`.
+
+- App screens still never move a button on hover; only the landing page lifts.
+- A submitting button gets `.is-loading`. It is NOT disabled, because a
+  disabled button drops its own name/value from the POST, which would turn
+  "Send and mark resolved" into "Send reply". A form that downloads a file and
+  never leaves the page needs `data-no-loading`, or its spinner runs until the
+  12-second fallback.
+- `.ef-btn` is now `overflow: hidden`. Never put a badge that pokes out of a
+  `.ef-btn`; use `.ef-icon-btn`, which has no clip (the bell relies on that).
+
+## AI background on the sign-in pages
+
+Added 20 November 2026 for `login.php`, `register.php` and `admin_login.php`
+only (admin because it is the other half of the User/Admin switch on the same
+card). Markup `partials/ai_background.php`, styles section 18 of
+`eduflex.css`, canvas in `initAiBackground()` in `eduflex.js`, which returns at
+once on any page without `.ef-ai-bg`. No library: Three.js would have to be
+vendored under rule 3 and is far heavier than a 2D canvas needs.
+
+- The card is untouched. Only `.ef-auth-page.has-ai-bg` loses its gradient.
+- `index.php` has it too, in the hero only (`$aiBgVariant = 'landing'`,
+  section 18b), contained in `.ef-hero-stage` rather than fixed, with no brain
+  and a denser network. An IntersectionObserver stops the canvas once the
+  hero is scrolled away. Do not make it fixed on the landing page: the long
+  sections below would have particles behind tables and body text.
+- To screenshot it headless, use `--force-prefers-reduced-motion`. With
+  `--virtual-time-budget` alone Chrome may capture before the 1.4s fade-in
+  and the canvas looks empty, which reads as a bug and is not one.
+
+## Class names already taken by the companion
+
+`.ef-thread`, `.ef-msg`, `.ef-msg-ai`, `.ef-msg-user`, `.ef-msg-avatar` and
+`.ef-bubble*` belong to the AI companion's chat. On 19 November 2026 the
+support conversation reused `.ef-thread` and `.ef-msg`, and its white box,
+padding and `align-self: flex-start` leaked into the companion: every message
+got a frame and the learner's questions moved left. Patrick saw it in a
+screenshot the next day. The support side is now `.ef-conv` / `.ef-conv-msg`,
+and `tests/admin_test.php` fails if the partial borrows the old names. Grep
+the stylesheet for a class before inventing it.
+
+The companion also has scroll buttons (section 20): "Back to top" and "Jump
+to latest", centred at the bottom of the thread, each shown only when useful.
+
+## Login animation
+
+Added 20 November 2026. The login stays a normal server-side POST; nothing
+about authentication moved to JavaScript.
+
+- `auth_complete_login()` sets `$_SESSION['_login_welcome']`. It is the only
+  place a sign-in becomes real (after password, emailed code and the active
+  check), so a failed login can never see the success screen.
+  `tests/auth_test.php` asserts the flag is set there and nowhere else.
+- SHELL reads and clears it on the first app page and shows
+  `partials/login_welcome.php` over it with `body.ef-entering`. Since
+  24 November 2026 the team sees it too, with its own wording ("Opening the
+  Admin Dashboard..."), chosen from `admin_is_admin()` in SHELL. A learner
+  refused at the admin door is signed out by `admin_login.php`, which destroys
+  the marker with the session. Both doors have "Authenticating..." and the
+  error shake. Proved end to end with a throwaway account granted and revoked
+  by `tools/make_admin.php`, never by signing in as `eduflex54@gmail.com`,
+  which from an untrusted test client would email a code to the team inbox.
+- **Signing out** (24 November 2026): `auth/logout.php` reads the role
+  BEFORE `auth_logout()`, then sends everybody to the landing page, as
+  Patrick asked: `index.php?signed_out=1` for a learner,
+  `?signed_out=team` for the team. `index.php` shows a toast that leaves by
+  itself after six seconds. The message is `partials/signed_out_notice.php`,
+  fixed wording, never anything from the query string, and only the exact
+  value `team` picks the team wording. eduflex.js strips the flag from the
+  address bar once shown. A brief "Signing you out..." screen comes from
+  `initSignOut()` on the sidebar link's `data-signout`; the href alone still
+  signs out with no JavaScript. Section 21 of `eduflex.css`. (For a few hours
+  each person went to their own sign-in page instead; both sign-in pages
+  still understand the flag, harmlessly.)
+- The sequence is pure CSS (section 19), about 2.3s, skippable by click, tap
+  or Escape. eduflex.js only skips, counts up whole-number stat tiles, and
+  removes the overlay and `ef-entering` at 3.7s.
+- The sidebar entrance runs only above 860px; below that the sidebar is a
+  transform-driven drawer and an entrance transform would fight it.
+- Headless screenshots do not advance these CSS animations; use
+  `--force-prefers-reduced-motion` to see the finished state.
+
+Python 3.12 was installed for the user with winget on 19 November 2026, at
+`%LOCALAPPDATA%\Programs\Python\Python312\python.exe`. Open a NEW terminal for
+`python build_pages.py` to resolve to it rather than the Store alias.
+
 ## Still to do
 
 1. **The AI-output validation rubric run. Start here. Only Patrick can do it.**

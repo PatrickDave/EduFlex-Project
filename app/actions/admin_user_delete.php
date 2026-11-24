@@ -26,16 +26,25 @@ require_once __DIR__ . '/../../includes/admin.php';
 
 admin_require();
 
+/* Where to go afterwards, from a fixed set rather than the POST as given.
+   'account' is the Manage User Accounts details screen, added 19 November
+   2026; anything else is Team Settings, where this action started. An
+   unchecked return field is an open redirect wearing a different hat. */
+$fromAccount = (string) ($_POST['from'] ?? '') === 'account';
+$back = $fromAccount
+    ? '../admin_user.php?id=' . (int) ($_POST['user_id'] ?? 0)
+    : '../admin_settings.php';
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check($_POST['_csrf'] ?? null)) {
     flash_set('users_error', 'Your session expired. Please try again.');
-    redirect('../admin_settings.php');
+    redirect($back);
 }
 
 $target = admin_user((int) ($_POST['user_id'] ?? 0));
 
 if ($target === null) {
     flash_set('users_error', 'That learner no longer exists.');
-    redirect('../admin_settings.php');
+    redirect($back);
 }
 
 $typed = trim((string) ($_POST['confirm_email'] ?? ''));
@@ -43,7 +52,7 @@ $typed = trim((string) ($_POST['confirm_email'] ?? ''));
 if ($typed === '') {
     flash_set('users_error',
         'Type the learner\'s email address to confirm. Nothing was deleted.');
-    redirect('../admin_settings.php');
+    redirect($back);
 }
 
 $result = auth_delete_account((int) $target['user_id'], $typed);
@@ -59,7 +68,7 @@ if (!$result['ok']) {
         ? sprintf('That did not match. Type %s exactly to delete that account. '
                   . 'Nothing was deleted.', (string) $target['email'])
         : (string) $result['error']);
-    redirect('../admin_settings.php');
+    redirect($back);
 }
 
 flash_set('users_ok', sprintf(
@@ -70,4 +79,5 @@ flash_set('users_ok', sprintf(
             $result['files'], $result['files'] === 1 ? '' : 's')
         : ''
 ));
-redirect('../admin_settings.php');
+// The account page no longer exists, so a delete from there lands on the list.
+redirect($fromAccount ? '../admin_users.php' : $back);

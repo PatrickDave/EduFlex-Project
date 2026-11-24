@@ -19,16 +19,25 @@ require_once __DIR__ . '/../../includes/admin.php';
 
 admin_require();
 
+/* Where to go afterwards, from a fixed set rather than the POST as given.
+   'account' is the Manage User Accounts details screen, added 19 November
+   2026; anything else is Team Settings, where this action started. An
+   unchecked return field is an open redirect wearing a different hat. */
+$fromAccount = (string) ($_POST['from'] ?? '') === 'account';
+$back = $fromAccount
+    ? '../admin_user.php?id=' . (int) ($_POST['user_id'] ?? 0)
+    : '../admin_settings.php';
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_check($_POST['_csrf'] ?? null)) {
     flash_set('users_error', 'Your session expired. Please try again.');
-    redirect('../admin_settings.php');
+    redirect($back);
 }
 
 $target = admin_user((int) ($_POST['user_id'] ?? 0));
 
 if ($target === null) {
     flash_set('users_error', 'That learner no longer exists.');
-    redirect('../admin_settings.php');
+    redirect($back);
 }
 
 try {
@@ -37,13 +46,13 @@ try {
 } catch (Throwable $e) {
     error_log('EduFlex admin export failed: ' . $e->getMessage());
     flash_set('users_error', 'That export could not be produced.');
-    redirect('../admin_settings.php');
+    redirect($back);
 }
 
 if ($json === false) {
     error_log('EduFlex admin export could not be encoded: ' . json_last_error_msg());
     flash_set('users_error', 'That export could not be produced.');
-    redirect('../admin_settings.php');
+    redirect($back);
 }
 
 /* The learner's id rather than their name in the filename: a name goes through

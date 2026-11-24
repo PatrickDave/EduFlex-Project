@@ -396,6 +396,21 @@ check('it is set for every call, not only the JSON ones', (function () use ($aiS
     return $budgetAt !== false && $jsonAt !== false && $budgetAt < $jsonAt;
 })());
 
+/* 19 November 2026. gemini-3.5-flash-lite rejects thinkingBudget 0 with a 400
+   and accepts thinkingLevel "minimal" with 0 thought tokens. The driver resends
+   once with the level form on a 400, so switching to a lite model works. */
+check('a 400 is resent once with thinkingLevel minimal', (function () use ($aiSource) {
+    $gemini = (string) (strstr($aiSource, 'class GeminiProvider') ?: '');
+    return str_contains($gemini, "\$res['status'] === 400")
+        && (bool) preg_match("/'thinkingLevel'\s*=>\s*'minimal'/", $gemini);
+})());
+
+check('the fallback never turns thinking back on', (function () use ($aiSource) {
+    // "low" or a removed thinkingConfig would let reasoning eat the token cap.
+    $gemini = (string) (strstr($aiSource, 'class GeminiProvider') ?: '');
+    return !preg_match("/'thinkingLevel'\s*=>\s*'(?!minimal')/", $gemini);
+})());
+
 // CHAT_CONTEXT_CHUNKS lives in chat.php, which this suite does not load.
 check('the cap it protects is still the one that was measured against',
     QUESTIONS_PER_SET === 8);

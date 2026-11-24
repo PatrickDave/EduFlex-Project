@@ -136,6 +136,25 @@ $migrations = [
                       ADD COLUMN bloom_level VARCHAR(20) NULL DEFAULT NULL
                       AFTER topic_progress_id",
     ],
+    [
+        'name'  => 'support_reply table (replies on support requests)',
+        'since' => '2026-11-19',
+        'check' => static fn(PDO $pdo): bool => migrate_table_exists($pdo, 'support_reply'),
+        'sql'   => 'CREATE TABLE support_reply (
+            reply_id INT(11) NOT NULL AUTO_INCREMENT,
+            request_id INT(11) NOT NULL,
+            author_id INT(11) NULL,
+            from_team TINYINT(1) NOT NULL DEFAULT 0,
+            message TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (reply_id),
+            KEY idx_reply_request (request_id, reply_id),
+            CONSTRAINT fk_reply_request FOREIGN KEY (request_id)
+              REFERENCES support_request (request_id) ON DELETE CASCADE,
+            CONSTRAINT fk_reply_author FOREIGN KEY (author_id)
+              REFERENCES user (user_id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+    ],
 ];
 
 /* -------------------------------------------------------------------------

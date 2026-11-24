@@ -58,6 +58,22 @@ if ($user !== null
     && !str_starts_with($active, 'admin')) {{
     redirect('admin.php');
 }}
+
+/* The "Login Successful" welcome, once, on the first page after signing in.
+   includes/auth.php sets the marker in auth_complete_login(), which only a
+   successful sign-in reaches. Read and cleared here so a refresh does not
+   replay it. Learners and the team both see it (the team since 24 November
+   2026, at Patrick's request), each with its own message: see
+   partials/login_welcome.php. A learner who tries the admin door is signed
+   out by admin_login.php, which destroys the session and the marker with it,
+   so this never plays for a refused sign-in on either door. */
+$loginWelcome = false;
+$loginWelcomeTeam = false;
+if (isset($_SESSION['_login_welcome'])) {{
+    unset($_SESSION['_login_welcome']);
+    $loginWelcome = $user !== null;
+    $loginWelcomeTeam = $loginWelcome && admin_is_admin($user);
+}}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -68,7 +84,9 @@ if ($user !== null
 <link href="../assets/vendor/bootstrap-5.3.3.min.css" rel="stylesheet">
 <link href="<?= asset('../assets/css/eduflex.css') ?>" rel="stylesheet">
 </head>
-<body>
+<body<?= $loginWelcome ? ' class="ef-entering"' : '' ?>>
+
+<?php if ($loginWelcome): include __DIR__ . '/../partials/login_welcome.php'; endif; ?>
 
 <div class="ef-shell">
 
@@ -116,7 +134,7 @@ $weekMax   = max(1, max(array_column($week, 'value')));
 
         <div class="ef-page-head">
           <div>
-            <h2>Welcome back, <?= e(auth_first_name()) ?>.</h2>
+            <h2>Welcome back, <span class="ef-greet-name"><?= e(auth_first_name()) ?></span>!</h2>
             <p>
               <?php if ($stage['processed'] === 0): ?>
                 Let's get your first material in.
@@ -306,7 +324,11 @@ $flashError = flash_get('error');
             <div class="ef-alert ef-alert-error"><?= e((string) $flashError) ?></div>
           <?php endif; ?>
 
-          <div class="ef-thread" style="flex:1 1 auto;overflow-y:auto;" data-thread>
+          <?php /* The wrapper gives the floating scroll buttons a corner of the
+                   conversation to sit in (20 November 2026). It takes over the
+                   thread's place in the column; the thread still scrolls. */ ?>
+          <div class="ef-thread-wrap">
+          <div class="ef-thread" style="flex:1 1 auto;overflow-y:auto;min-height:0;" data-thread>
             <div class="ef-msg ef-msg-ai">
               <span class="ef-msg-avatar"></span>
               <div class="ef-bubble ef-bubble-ai">
@@ -339,6 +361,24 @@ $flashError = flash_get('error');
               </div>
             <?php endforeach; ?>
           </div>
+
+            <div class="ef-scroll-btns">
+              <button type="button" class="ef-scroll-btn" data-scroll-top
+                      aria-label="Scroll to the start of the conversation" title="Back to top">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 12.5V3.5M3.8 7.7 8 3.5l4.2 4.2" stroke="currentColor"
+                        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button type="button" class="ef-scroll-btn ef-scroll-btn-latest" data-scroll-latest
+                      aria-label="Scroll to the latest message" title="Jump to latest">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 3.5v9M3.8 8.3 8 12.5l4.2-4.2" stroke="currentColor"
+                        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div><!-- /.ef-thread-wrap -->
 
           <?php if ($active): ?>
             <div style="display:flex;gap:10px;flex-wrap:wrap;" data-suggestions>
@@ -534,6 +574,45 @@ $flashError = flash_get('error');
         }
 
         function esc(s) { return $('<div>').text(s == null ? '' : s).html(); }
+
+        /* ---- scroll buttons (20 November 2026) ----
+           "Jump to latest" shows once the reader has scrolled up away from the
+           newest message; "Back to top" once they are well into a long
+           conversation. Each hides itself when it would do nothing. */
+        var $toLatest = $('[data-scroll-latest]');
+        var $toTop = $('[data-scroll-top]');
+        var smoothScroll = !(window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        var scrollQueued = false;
+
+        function updateScrollButtons() {
+          scrollQueued = false;
+          var el = $thread[0];
+          if (!el) { return; }
+          var fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+          $toLatest.toggleClass('is-visible', fromBottom > 160);
+          $toTop.toggleClass('is-visible', el.scrollTop > 400);
+        }
+        function queueScrollButtons() {
+          if (scrollQueued) { return; }
+          scrollQueued = true;
+          window.requestAnimationFrame(updateScrollButtons);
+        }
+        function scrollThreadTo(top) {
+          var el = $thread[0];
+          if (!el) { return; }
+          if (el.scrollTo) {
+            el.scrollTo({ top: top, behavior: smoothScroll ? 'smooth' : 'auto' });
+          } else {
+            el.scrollTop = top;
+          }
+        }
+
+        $thread.on('scroll', queueScrollButtons);
+        $(window).on('resize', queueScrollButtons);
+        $toLatest.on('click', function () { scrollThreadTo($thread[0].scrollHeight); });
+        $toTop.on('click', function () { scrollThreadTo(0); });
+        updateScrollButtons();
 
         /* ---- asking the companion ---- */
 
@@ -1841,7 +1920,7 @@ $plan      = subscription_for($uid);
               </p>
 
               <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                <form action="actions/export_data.php" method="post" style="margin:0;">
+                <form data-no-loading action="actions/export_data.php" method="post" style="margin:0;">
                   <?= csrf_field() ?>
                   <button class="ef-btn ef-btn-primary" type="submit">Export my data</button>
                 </form>
@@ -2155,8 +2234,9 @@ $draftMessage = (string) ($draft['message'] ?? '');
 
         <div class="ef-alert ef-alert-info">
           EduFlex is a capstone prototype, not a product. There is no helpdesk on duty.
-          What you send here is stored against your account for the project team to read,
-          and you will see it in the list below. Nothing is emailed to anybody.
+          What you send here is stored against your account for the project team to read.
+          When they reply, you get a notification and the reply appears under your
+          request below, where you can answer back. Nothing is emailed to anybody.
         </div>
 
         <div class="ef-row">
@@ -2233,12 +2313,17 @@ $draftMessage = (string) ($draft['message'] ?? '');
                 </div>
               <?php else: ?>
                 <?php foreach ($requests as $r): ?>
-                  <?php $status = (string) $r['status']; ?>
+                  <?php
+                    $status      = (string) $r['status'];
+                    $replyCount  = (int) ($r['reply_count'] ?? 0);
+                    $teamReplies = (int) ($r['team_replies'] ?? 0);
+                    $threadHref  = 'support_thread.php?id=' . (int) $r['request_id'];
+                  ?>
                   <div class="ef-list-row ef-notif">
                     <span class="ef-list-ico">#<?= (int) $r['request_id'] ?></span>
                     <div class="ef-list-main">
                       <div class="ef-notif-head">
-                        <span class="ef-list-title"><?= e((string) $r['subject']) ?></span>
+                        <a class="ef-list-title ef-support-link" href="<?= e($threadHref) ?>"><?= e((string) $r['subject']) ?></a>
                         <span class="ef-band ef-band-<?= e(support_status_band($status)) ?>">
                           <?= e(support_status_label($status)) ?>
                         </span>
@@ -2249,7 +2334,19 @@ $draftMessage = (string) ($draft['message'] ?? '');
                       <div class="ef-list-meta">
                         <?= e(support_type_label((string) $r['request_type'])) ?>
                       </div>
-                      <div class="ef-notif-body"><?= nl2br(e((string) $r['message'])) ?></div>
+                      <div class="ef-notif-body ef-support-preview"><?= nl2br(e((string) $r['message'])) ?></div>
+                      <div class="ef-support-thread-row">
+                        <?php if ($teamReplies > 0): ?>
+                          <span class="ef-reply-flag ef-reply-flag-team">
+                            The team replied<?= $teamReplies > 1 ? ' ' . $teamReplies . ' times' : '' ?>
+                          </span>
+                        <?php else: ?>
+                          <span class="ef-second" style="font-size:12px;">No reply from the team yet</span>
+                        <?php endif; ?>
+                        <a class="ef-btn ef-btn-ghost ef-btn-sm" href="<?= e($threadHref) ?>">
+                          <?= $replyCount > 0 ? 'View conversation' : 'Open' ?>
+                        </a>
+                      </div>
                     </div>
                   </div>
                 <?php endforeach; ?>
@@ -2766,6 +2863,7 @@ ADMIN = '''<?php
 $counts     = admin_status_counts();
 $typeCounts = admin_type_counts();
 $waiting    = admin_open_count();
+$needsReply = admin_needs_reply_count();
 $recent     = admin_requests('', '', 5);
 $ok         = flash_get('admin_ok');
 $err        = flash_get('admin_error');
@@ -2791,6 +2889,13 @@ $err        = flash_get('admin_error');
             <div class="ef-admin-headline-n"><?= (int) $waiting ?></div>
             <div class="ef-admin-headline-l">
               <?= $waiting === 1 ? 'request waiting on you' : 'requests waiting on you' ?>
+            </div>
+            <div class="ef-admin-headline-sub">
+              <?php if ($needsReply > 0): ?>
+                <span class="ef-reply-flag"><?= (int) $needsReply ?> need<?= $needsReply === 1 ? 's' : '' ?> a reply</span>
+              <?php else: ?>
+                <span class="ef-second">Every open conversation has a reply from the team</span>
+              <?php endif; ?>
             </div>
           </div>
           <a class="ef-btn ef-btn-primary" href="admin_requests.php">Manage requests</a>
@@ -3002,6 +3107,255 @@ $keep = static function (string $status): string {
           docs/rubric-run.md: one is what the validator caught, the other is what
           it did not.
         </p>
+
+      </div>
+'''
+
+
+# ============================================================================
+# ONE CONVERSATION, the team's side. Added 19 November 2026.
+#
+# The request is loaded in the requires slot, before any output, so a missing
+# id can still redirect. By the time this body runs, $thread is a real row.
+# ============================================================================
+ADMIN_THREAD_REQUIRES = (
+    "require_once __DIR__ . '/../includes/admin.php';\n"
+    "admin_require();\n"
+    "$thread = admin_request((int) ($_GET['id'] ?? 0));\n"
+    "if ($thread === null) {\n"
+    "    flash_set('admin_error', 'That request could not be found. It may have been "
+    "deleted along with the account that sent it.');\n"
+    "    redirect('admin_requests.php');\n"
+    "}"
+)
+
+ADMIN_THREAD = '''<?php
+$requestId    = (int) $thread['request_id'];
+$replies      = support_replies($requestId);
+$status       = (string) $thread['status'];
+$viewerIsTeam = true;
+$ok           = flash_get('admin_ok');
+$err          = flash_get('admin_error');
+$draft        = (string) (flash_get('admin_reply_draft') ?? '');
+$firstName    = trim(explode(' ', trim((string) $thread['full_name']))[0] ?? '');
+$needsReply   = admin_needs_reply($thread);
+?>
+      <div class="ef-content">
+
+        <a class="ef-back-link" href="admin_requests.php">&larr; All requests</a>
+
+        <div class="ef-page-head">
+          <div style="min-width:0;">
+            <h2 class="ef-thread-title">#<?= $requestId ?> &middot; <?= e((string) $thread['subject']) ?></h2>
+            <p><?= e(support_type_label((string) $thread['request_type'])) ?></p>
+          </div>
+          <div class="ef-admin-req-pills">
+            <?php if ($needsReply): ?>
+              <span class="ef-reply-flag">Needs a reply</span>
+            <?php endif; ?>
+            <span class="ef-band ef-band-<?= e(support_status_band($status)) ?>">
+              <?= e(support_status_label($status)) ?>
+            </span>
+          </div>
+        </div>
+
+        <?php if ($ok): ?>
+          <div class="ef-alert ef-alert-ok"><?= e((string) $ok) ?></div>
+        <?php endif; ?>
+        <?php if ($err): ?>
+          <div class="ef-alert ef-alert-error"><?= e((string) $err) ?></div>
+        <?php endif; ?>
+
+        <div class="ef-row">
+          <div class="ef-col ef-stack">
+
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-head">
+                <div class="ef-card-title">Conversation</div>
+                <span class="ef-muted" style="font-size:11.5px;">
+                  <?= count($replies) + 1 ?> message<?= count($replies) === 0 ? '' : 's' ?>
+                </span>
+              </div>
+              <?php include __DIR__ . '/../partials/support_thread.php'; ?>
+            </section>
+
+            <form class="ef-card ef-card-lg ef-reply-form" action="actions/admin_reply.php" method="post">
+              <?= csrf_field() ?>
+              <input type="hidden" name="request_id" value="<?= $requestId ?>">
+              <label class="ef-card-title ef-reply-label" for="reply-message">
+                Reply<?= $firstName !== '' ? ' to ' . e($firstName) : '' ?>
+              </label>
+              <textarea class="ef-input" id="reply-message" name="message" rows="5"
+                        maxlength="<?= (int) SUPPORT_MESSAGE_MAX ?>"
+                        placeholder="Write your reply. Be specific about what you found and what the learner should do next."
+                        required><?= e($draft) ?></textarea>
+              <p class="ef-note">
+                The learner sees this under their request on the Support page and gets a
+                notification. Nothing is emailed.
+                <?php if ($status === 'open'): ?>
+                  Sending moves the request to <?= e(support_status_label('in_progress')) ?>.
+                <?php endif; ?>
+              </p>
+              <div class="ef-reply-actions">
+                <button class="ef-btn ef-btn-primary" type="submit">Send reply</button>
+                <?php if ($status !== 'resolved'): ?>
+                  <button class="ef-btn ef-btn-ghost" type="submit" name="resolve" value="1">
+                    Send and mark resolved
+                  </button>
+                <?php endif; ?>
+              </div>
+            </form>
+
+          </div>
+
+          <div class="ef-col-fixed-360 ef-stack">
+
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:12px;">From</div>
+              <dl class="ef-thread-facts">
+                <dt>Name</dt><dd><?= e((string) $thread['full_name']) ?></dd>
+                <dt>Email</dt><dd><?= e((string) $thread['email']) ?></dd>
+                <dt>Sent</dt>
+                <dd><?= e(date('j M Y, g:i A', strtotime((string) $thread['created_at']) ?: time())) ?></dd>
+              </dl>
+            </section>
+
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:6px;">Status</div>
+              <div class="ef-card-sub" style="margin-bottom:14px;">
+                The learner sees the status on their Support page.
+              </div>
+              <div class="ef-reply-actions">
+                <?php foreach (ADMIN_STATUS_ACTIONS as $next => $verb): ?>
+                  <?php if ($next === $status) { continue; } ?>
+                  <form method="post" action="actions/admin_status.php" style="margin:0;">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="request_id" value="<?= $requestId ?>">
+                    <input type="hidden" name="status" value="<?= e($next) ?>">
+                    <input type="hidden" name="back" value="admin_thread.php">
+                    <button class="ef-btn ef-btn-ghost ef-btn-sm" type="submit"><?= e($verb) ?></button>
+                  </form>
+                <?php endforeach; ?>
+              </div>
+            </section>
+
+          </div>
+        </div>
+
+      </div>
+'''
+
+
+# ============================================================================
+# ONE CONVERSATION, the learner's side. Added 19 November 2026.
+#
+# Ownership is checked in SQL by support_request_for_user() in the requires
+# slot, before any output. A request id that is not this learner's gets the
+# same answer as one that does not exist.
+# ============================================================================
+SUPPORT_THREAD_REQUIRES = (
+    "require_once __DIR__ . '/../includes/support.php';\n"
+    "auth_require_login();\n"
+    "$thread = support_request_for_user((int) (auth_user()['user_id'] ?? 0), "
+    "(int) ($_GET['id'] ?? 0));\n"
+    "if ($thread === null) {\n"
+    "    flash_set('support_error', 'That request could not be found.');\n"
+    "    redirect('support.php');\n"
+    "}"
+)
+
+SUPPORT_THREAD = '''<?php
+$requestId    = (int) $thread['request_id'];
+$replies      = support_replies($requestId);
+$status       = (string) $thread['status'];
+$viewerIsTeam = false;
+$ok           = flash_get('support_ok');
+$err          = flash_get('support_error');
+$draft        = (string) (flash_get('support_reply_draft') ?? '');
+$teamReplies  = count(array_filter($replies, static fn(array $r): bool => (int) $r['from_team'] === 1));
+
+$statusNote = match ($status) {
+    'open'        => 'Recorded. The project team has not picked this up yet.',
+    'in_progress' => 'The project team is looking at this.',
+    'resolved'    => 'The team marked this resolved. If it is not, reply below and it reopens.',
+    'closed'      => 'Closed. Replies are turned off. Send a new request if you still need help.',
+    default       => '',
+};
+?>
+      <div class="ef-content">
+
+        <a class="ef-back-link" href="support.php">&larr; All your requests</a>
+
+        <div class="ef-page-head">
+          <div style="min-width:0;">
+            <h2 class="ef-thread-title"><?= e((string) $thread['subject']) ?></h2>
+            <p>
+              #<?= $requestId ?> &middot; <?= e(support_type_label((string) $thread['request_type'])) ?>
+              &middot; sent <?= e(date('j M Y', strtotime((string) $thread['created_at']) ?: time())) ?>
+            </p>
+          </div>
+          <span class="ef-band ef-band-<?= e(support_status_band($status)) ?>">
+            <?= e(support_status_label($status)) ?>
+          </span>
+        </div>
+
+        <?php if ($ok): ?><div class="ef-alert ef-alert-ok"><?= e((string) $ok) ?></div><?php endif; ?>
+        <?php if ($err): ?><div class="ef-alert ef-alert-error"><?= e((string) $err) ?></div><?php endif; ?>
+
+        <div class="ef-row">
+          <div class="ef-col ef-stack">
+
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-head">
+                <div class="ef-card-title">Conversation with the project team</div>
+                <span class="ef-muted" style="font-size:11.5px;">
+                  <?= $teamReplies === 0 ? 'No reply yet' : $teamReplies . ' from the team' ?>
+                </span>
+              </div>
+              <?php include __DIR__ . '/../partials/support_thread.php'; ?>
+              <?php if ($teamReplies === 0): ?>
+                <p class="ef-note" style="margin-top:14px;">
+                  Nobody is on duty, so a reply comes when the team next reviews requests.
+                  You will get a notification when it does.
+                </p>
+              <?php endif; ?>
+            </section>
+
+            <?php if ($status === 'closed'): ?>
+              <div class="ef-alert ef-alert-info" style="margin:0;">
+                This request is closed, so it cannot take more replies.
+                <a href="support.php">Send a new request</a> if you still need help.
+              </div>
+            <?php else: ?>
+              <form class="ef-card ef-card-lg ef-reply-form" action="actions/support_reply.php" method="post">
+                <?= csrf_field() ?>
+                <input type="hidden" name="request_id" value="<?= $requestId ?>">
+                <label class="ef-card-title ef-reply-label" for="reply-message">Write a reply</label>
+                <textarea class="ef-input" id="reply-message" name="message" rows="4"
+                          maxlength="<?= (int) SUPPORT_MESSAGE_MAX ?>"
+                          placeholder="Add detail, answer the team's question, or say whether it worked."
+                          required><?= e($draft) ?></textarea>
+                <p class="ef-note">
+                  Only you and the project team can read this conversation.
+                  <?php if ($status === 'resolved'): ?>
+                    Replying reopens the request.
+                  <?php endif; ?>
+                </p>
+                <div class="ef-reply-actions">
+                  <button class="ef-btn ef-btn-primary" type="submit">Send reply</button>
+                </div>
+              </form>
+            <?php endif; ?>
+
+          </div>
+
+          <div class="ef-col-fixed-360 ef-stack">
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:6px;">Where this stands</div>
+              <p class="ef-card-sub" style="margin:0;"><?= e($statusNote) ?></p>
+            </section>
+          </div>
+        </div>
 
       </div>
 '''
@@ -3284,7 +3638,9 @@ $learners  = admin_users();
         <section class="ef-card ef-card-lg">
           <div class="ef-card-title" style="margin-bottom:6px;">Users</div>
           <div class="ef-card-sub" style="margin-bottom:16px;">
-            Everyone taking part, and what is stored under each account
+            Everyone taking part, and what is stored under each account.
+            To search, edit or deactivate accounts, use
+            <a href="admin_users.php">Manage User Accounts</a>.
           </div>
 
           <?php if ($usersOk): ?>
@@ -3332,7 +3688,7 @@ $learners  = admin_users();
                       <?php endif; ?>
                     </p>
 
-                    <form action="actions/admin_user_export.php" method="post"
+                    <form data-no-loading action="actions/admin_user_export.php" method="post"
                           style="margin:0 0 18px;">
                       <?= csrf_field() ?>
                       <input type="hidden" name="user_id" value="<?= (int) $u['user_id'] ?>">
@@ -3415,6 +3771,492 @@ $learners  = admin_users();
 '''
 
 
+# ============================================================================
+# MANAGE USER ACCOUNTS, the list. Added 19 November 2026.
+#
+# Every registered account, searchable and filterable. Learners can be opened,
+# edited, deactivated, exported and deleted; team accounts are listed so the
+# count is honest, but only ever shown, never acted on. See includes/admin.php.
+# ============================================================================
+ADMIN_USERS = '''<?php
+/* Every filter is checked against a fixed list here, and again inside
+   admin_accounts(), so nothing a visitor types reaches the SQL or an href. */
+$q        = is_string($_GET['q'] ?? null) ? trim((string) $_GET['q']) : '';
+$q        = mb_substr($q, 0, 100);
+$pick     = static fn(string $key, array $allowed): string =>
+    is_string($_GET[$key] ?? null) && in_array($_GET[$key], $allowed, true) ? (string) $_GET[$key] : '';
+$status   = $pick('status', ['active', 'inactive']);
+$verified = $pick('verified', ['yes', 'no']);
+$role     = $pick('role', ['learner', 'team']);
+$sort     = $pick('sort', array_keys(ADMIN_ACCOUNT_SORTS)) ?: 'newest';
+
+$accounts = admin_accounts($q, $status, $verified, $role, $sort);
+$summary  = admin_account_summary();
+$ok       = flash_get('users_ok');
+$err      = flash_get('users_error');
+$filtered = $q !== '' || $status !== '' || $verified !== '' || $role !== '';
+
+$link = static function (array $over) use ($q, $status, $verified, $role, $sort): string {
+    $params = array_filter(array_merge(
+        ['q' => $q, 'status' => $status, 'verified' => $verified, 'role' => $role,
+         'sort' => $sort === 'newest' ? '' : $sort],
+        $over
+    ), static fn($v) => (string) $v !== '');
+    return $params === [] ? 'admin_users.php' : 'admin_users.php?' . http_build_query($params);
+};
+
+$tiles = [
+    ['Total accounts', $summary['total'],      $link(['status' => '', 'verified' => '', 'role' => '', 'q' => '']), !$filtered],
+    ['Active',         $summary['active'],     $link(['status' => 'active']),   $status === 'active'],
+    ['Deactivated',    $summary['inactive'],   $link(['status' => 'inactive']), $status === 'inactive'],
+    ['Email not verified', $summary['unverified'], $link(['verified' => 'no']), $verified === 'no'],
+    ['Team',           $summary['team'],       $link(['role' => 'team']),       $role === 'team'],
+];
+?>
+      <div class="ef-content">
+
+        <div class="ef-page-head">
+          <div>
+            <h2>Manage user accounts</h2>
+            <p>Everyone registered on EduFlex. Open an account to view, edit, deactivate or delete it.</p>
+          </div>
+        </div>
+
+        <?php if ($ok): ?>
+          <div class="ef-alert ef-alert-ok"><?= e((string) $ok) ?></div>
+        <?php endif; ?>
+        <?php if ($err): ?>
+          <div class="ef-alert ef-alert-error"><?= e((string) $err) ?></div>
+        <?php endif; ?>
+
+        <div class="ef-admin-counts">
+          <?php foreach ($tiles as [$label, $n, $href, $on]): ?>
+            <a class="ef-admin-count ef-admin-count-link<?= $on ? ' is-on' : '' ?>" href="<?= e($href) ?>">
+              <div class="ef-admin-count-n"><?= (int) $n ?></div>
+              <div class="ef-admin-count-l"><?= e($label) ?></div>
+            </a>
+          <?php endforeach; ?>
+        </div>
+
+        <form class="ef-card ef-card-lg ef-account-filters" method="get" action="admin_users.php" role="search">
+          <div class="ef-field ef-account-search">
+            <label class="ef-label" for="q">Search</label>
+            <input class="ef-input" type="search" id="q" name="q" maxlength="100"
+                   value="<?= e($q) ?>" placeholder="Name, email or user ID" autocomplete="off">
+          </div>
+          <div class="ef-field">
+            <label class="ef-label" for="status">Status</label>
+            <select class="ef-input" id="status" name="status">
+              <option value="">Any</option>
+              <option value="active"<?= $status === 'active' ? ' selected' : '' ?>>Active</option>
+              <option value="inactive"<?= $status === 'inactive' ? ' selected' : '' ?>>Deactivated</option>
+            </select>
+          </div>
+          <div class="ef-field">
+            <label class="ef-label" for="verified">Email</label>
+            <select class="ef-input" id="verified" name="verified">
+              <option value="">Any</option>
+              <option value="yes"<?= $verified === 'yes' ? ' selected' : '' ?>>Verified</option>
+              <option value="no"<?= $verified === 'no' ? ' selected' : '' ?>>Not verified</option>
+            </select>
+          </div>
+          <?php /* The Role dropdown was removed on 19 November 2026 at Patrick's
+                   request. The Team tile above still filters by role, so it
+                   is carried through here when set. */ ?>
+          <?php if ($role !== ''): ?>
+            <input type="hidden" name="role" value="<?= e($role) ?>">
+          <?php endif; ?>
+          <div class="ef-field">
+            <label class="ef-label" for="sort">Sort</label>
+            <select class="ef-input" id="sort" name="sort">
+              <?php foreach (ADMIN_ACCOUNT_SORTS as $key => [$label, $unused]): ?>
+                <option value="<?= e($key) ?>"<?= $sort === $key ? ' selected' : '' ?>><?= e($label) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="ef-account-filter-actions">
+            <button class="ef-btn ef-btn-primary" type="submit">Apply</button>
+            <?php if ($filtered || $sort !== 'newest'): ?>
+              <a class="ef-btn ef-btn-ghost" href="admin_users.php">Clear</a>
+            <?php endif; ?>
+          </div>
+        </form>
+
+        <section class="ef-card ef-card-lg">
+          <div class="ef-card-head">
+            <div class="ef-card-title">
+              <?= $filtered ? 'Matching accounts' : 'All accounts' ?>
+            </div>
+            <span class="ef-muted" style="font-size:11.5px;">
+              <?= count($accounts) ?> of <?= (int) $summary['total'] ?>
+            </span>
+          </div>
+
+          <?php if ($accounts === []): ?>
+            <div class="ef-empty-state">
+              <div class="ef-empty-ico"></div>
+              <h5><?= $filtered ? 'No account matches' : 'No accounts yet' ?></h5>
+              <p>
+                <?= $filtered
+                      ? 'Try a shorter search, or clear the filters.'
+                      : 'Accounts appear here as participants register.' ?>
+              </p>
+            </div>
+          <?php else: ?>
+            <div class="ef-account-table-wrap">
+              <table class="ef-table ef-account-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Programme</th>
+                    <th>Status</th>
+                    <th>Activity</th>
+                    <th>Joined</th>
+                    <th><span class="visually-hidden">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($accounts as $a): ?>
+                    <?php
+                      $aid      = (int) $a['user_id'];
+                      $isTeam   = admin_is_admin($a);
+                      $isActive = (string) $a['account_status'] === 'active';
+                      $href     = 'admin_user.php?id=' . $aid;
+                    ?>
+                    <tr<?= $isActive ? '' : ' class="is-inactive"' ?>>
+                      <td data-label="User">
+                        <a class="ef-account-who" href="<?= e($href) ?>">
+                          <span class="ef-avatar ef-avatar-initials ef-account-avatar" aria-hidden="true"><?= e(avatar_initials((string) $a['full_name'])) ?></span>
+                          <span class="ef-account-who-text">
+                            <span class="ef-account-name"><?= e((string) $a['full_name']) ?></span>
+                            <span class="ef-account-email"><?= e((string) $a['email']) ?></span>
+                          </span>
+                        </a>
+                      </td>
+                      <td data-label="Programme">
+                        <?php if ($isTeam): ?>
+                          <span class="ef-second">Project team</span>
+                        <?php else: ?>
+                          <?= e((string) $a['program']) ?>
+                          <span class="ef-second">&middot; Year <?= (int) $a['year_level'] ?></span>
+                        <?php endif; ?>
+                      </td>
+                      <td data-label="Status">
+                        <div class="ef-account-pills">
+                          <span class="ef-band ef-band-<?= e(admin_account_status_band((string) $a['account_status'])) ?>">
+                            <?= e(admin_account_status_label((string) $a['account_status'])) ?>
+                          </span>
+                          <?php if ($isTeam): ?>
+                            <span class="ef-band ef-band-none">Team</span>
+                          <?php endif; ?>
+                          <?php if (($a['email_verified_at'] ?? null) === null): ?>
+                            <span class="ef-band ef-band-developing">Unverified</span>
+                          <?php endif; ?>
+                        </div>
+                      </td>
+                      <td data-label="Activity" class="ef-account-activity">
+                        <?= (int) $a['materials'] ?> material<?= (int) $a['materials'] === 1 ? '' : 's' ?>
+                        &middot; <?= (int) $a['attempts'] ?> attempt<?= (int) $a['attempts'] === 1 ? '' : 's' ?>
+                        &middot; <?= (int) $a['requests'] ?> request<?= (int) $a['requests'] === 1 ? '' : 's' ?>
+                      </td>
+                      <td data-label="Joined" class="ef-account-joined">
+                        <?= e(date('j M Y', strtotime((string) $a['created_at']) ?: time())) ?>
+                      </td>
+                      <td class="ef-account-actions">
+                        <a class="ef-btn ef-btn-ghost ef-btn-sm" href="<?= e($href) ?>">View</a>
+                        <?php if (!$isTeam): ?>
+                          <form method="post" action="actions/admin_user_status.php" style="margin:0;"
+                                data-confirm="<?= e($isActive
+                                    ? 'Deactivate ' . $a['email'] . '? They will be signed out and unable to sign in until you activate the account again. Nothing is deleted.'
+                                    : 'Activate ' . $a['email'] . '? They will be able to sign in again.') ?>">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="user_id" value="<?= $aid ?>">
+                            <input type="hidden" name="status" value="<?= $isActive ? 'inactive' : 'active' ?>">
+                            <input type="hidden" name="from" value="list">
+                            <button class="ef-btn ef-btn-sm <?= $isActive ? 'ef-btn-ghost ef-btn-warn' : 'ef-btn-primary' ?>" type="submit">
+                              <?= $isActive ? 'Deactivate' : 'Activate' ?>
+                            </button>
+                          </form>
+                        <?php endif; ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+
+          <p class="ef-note" style="margin-top:16px;">
+            Team accounts are listed but cannot be edited, deactivated or deleted here.
+            Team access is granted and revoked only with tools/make_admin.php.
+          </p>
+        </section>
+
+      </div>
+'''
+
+
+# ============================================================================
+# MANAGE USER ACCOUNTS, one account. Added 19 November 2026.
+#
+# The account is loaded in the requires slot, before any output, so a missing
+# id can still redirect.
+# ============================================================================
+ADMIN_USER_REQUIRES = (
+    "require_once __DIR__ . '/../includes/admin.php';\n"
+    "require_once __DIR__ . '/../includes/avatar.php';\n"
+    "admin_require();\n"
+    "$account = admin_account((int) ($_GET['id'] ?? 0));\n"
+    "if ($account === null) {\n"
+    "    flash_set('users_error', 'That account no longer exists.');\n"
+    "    redirect('admin_users.php');\n"
+    "}"
+)
+
+ADMIN_USER = '''<?php
+$aid       = (int) $account['user_id'];
+$isTeam    = admin_is_admin($account);
+$isActive  = (string) $account['account_status'] === 'active';
+$verified  = $account['email_verified_at'] ?? null;
+$requests  = admin_account_requests($aid);
+$isSelf    = $aid === (int) $user['user_id'];
+
+$ok          = flash_get('users_ok');
+$err         = flash_get('users_error');
+$fieldErrors = flash_get('users_field_errors') ?: [];
+$draft       = flash_get('users_draft') ?: [];
+
+$val = static fn(string $key, $fallback): string =>
+    (string) (array_key_exists($key, $draft) ? $draft[$key] : $fallback);
+$draftYear = (int) $val('year_level', (int) $account['year_level']);
+
+$date = static fn($value): string =>
+    $value === null || $value === '' ? '' : date('j M Y, g:i A', strtotime((string) $value) ?: time());
+?>
+      <div class="ef-content">
+
+        <a class="ef-back-link" href="admin_users.php">&larr; All accounts</a>
+
+        <div class="ef-page-head ef-account-head">
+          <div class="ef-account-head-main">
+            <span class="ef-avatar ef-avatar-initials ef-avatar-xl" aria-hidden="true"><?= e(avatar_initials((string) $account['full_name'])) ?></span>
+            <div style="min-width:0;">
+              <h2 class="ef-thread-title"><?= e((string) $account['full_name']) ?></h2>
+              <p class="ef-thread-title"><?= e((string) $account['email']) ?></p>
+              <div class="ef-account-pills" style="margin-top:8px;">
+                <span class="ef-band ef-band-<?= e(admin_account_status_band((string) $account['account_status'])) ?>">
+                  <?= e(admin_account_status_label((string) $account['account_status'])) ?>
+                </span>
+                <?php if ($isTeam): ?><span class="ef-band ef-band-none">Team</span><?php endif; ?>
+                <?php if ($verified === null): ?><span class="ef-band ef-band-developing">Email not verified</span><?php endif; ?>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <?php if ($ok): ?>
+          <div class="ef-alert ef-alert-ok"><?= e((string) $ok) ?></div>
+        <?php endif; ?>
+        <?php if ($err): ?>
+          <div class="ef-alert ef-alert-error"><?= e((string) $err) ?></div>
+        <?php endif; ?>
+
+        <div class="ef-row">
+          <div class="ef-col ef-stack">
+
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:14px;">Account details</div>
+              <dl class="ef-thread-facts ef-account-facts">
+                <dt>User ID</dt><dd><?= $aid ?></dd>
+                <dt>Full name</dt><dd><?= e((string) $account['full_name']) ?></dd>
+                <dt>Email</dt><dd><?= e((string) $account['email']) ?></dd>
+                <dt>Email verified</dt>
+                <dd><?= $verified === null ? 'Not verified' : e($date($verified)) ?></dd>
+                <?php if (!$isTeam): ?>
+                  <dt>Programme</dt><dd><?= e((string) $account['program']) ?></dd>
+                  <dt>Year level</dt><dd>Year <?= (int) $account['year_level'] ?></dd>
+                <?php endif; ?>
+                <dt>Role</dt><dd><?= $isTeam ? 'Project team' : 'Learner' ?></dd>
+                <dt>Status</dt><dd><?= e(admin_account_status_label((string) $account['account_status'])) ?></dd>
+                <dt>Profile picture</dt><dd><?= empty($account['avatar_path']) ? 'None, initials shown' : 'Uploaded' ?></dd>
+                <dt>Registered</dt><dd><?= e($date($account['created_at'])) ?></dd>
+              </dl>
+            </section>
+
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-title" style="margin-bottom:14px;">Activity</div>
+              <div class="ef-account-stats">
+                <?php foreach (['materials' => 'Materials', 'topics' => 'Topics', 'attempts' => 'Practice attempts', 'requests' => 'Support requests'] as $key => $label): ?>
+                  <div class="ef-account-stat">
+                    <div class="ef-admin-count-n"><?= (int) $account[$key] ?></div>
+                    <div class="ef-admin-count-l"><?= e($label) ?></div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <p class="ef-note" style="margin-top:12px;">
+                Counts only. What a learner uploaded, asked and answered stays private to them.
+              </p>
+            </section>
+
+            <section class="ef-card ef-card-lg">
+              <div class="ef-card-head">
+                <div class="ef-card-title">Support requests</div>
+                <span class="ef-muted" style="font-size:11.5px;"><?= count($requests) ?></span>
+              </div>
+              <?php if ($requests === []): ?>
+                <p class="ef-second" style="margin:0;font-size:13px;">This account has not sent any.</p>
+              <?php else: ?>
+                <?php foreach ($requests as $r): ?>
+                  <a class="ef-account-request" href="admin_thread.php?id=<?= (int) $r['request_id'] ?>">
+                    <span class="ef-account-request-main">
+                      <span class="ef-account-name">#<?= (int) $r['request_id'] ?> &middot; <?= e((string) $r['subject']) ?></span>
+                      <span class="ef-account-email"><?= e(support_type_label((string) $r['request_type'])) ?>
+                        &middot; <?= e(date('j M Y', strtotime((string) $r['created_at']) ?: time())) ?></span>
+                    </span>
+                    <span class="ef-band ef-band-<?= e(support_status_band((string) $r['status'])) ?>">
+                      <?= e(support_status_label((string) $r['status'])) ?>
+                    </span>
+                  </a>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </section>
+
+          </div>
+
+          <div class="ef-col-fixed-360 ef-stack">
+
+            <?php if ($isTeam): ?>
+              <section class="ef-card ef-card-lg">
+                <div class="ef-card-title" style="margin-bottom:6px;">Team account</div>
+                <p class="ef-card-sub" style="margin:0;">
+                  <?= $isSelf ? 'This is the account you are signed in with.' : 'A project team account.' ?>
+                  Team accounts cannot be edited, deactivated or deleted from this screen,
+                  so the help desk can never be locked out by accident. Change your own
+                  password and picture in Settings; grant or revoke team access with
+                  tools/make_admin.php.
+                </p>
+              </section>
+            <?php else: ?>
+
+              <form class="ef-card ef-card-lg" action="actions/admin_user_update.php" method="post">
+                <?= csrf_field() ?>
+                <input type="hidden" name="user_id" value="<?= $aid ?>">
+                <div class="ef-card-title" style="margin-bottom:6px;">Edit details</div>
+                <div class="ef-card-sub" style="margin-bottom:16px;">
+                  The learner is notified of any change.
+                </div>
+
+                <div class="ef-field">
+                  <label class="ef-label" for="full_name">Full name</label>
+                  <input class="ef-input<?= isset($fieldErrors['full_name']) ? ' is-invalid' : '' ?>"
+                         id="full_name" name="full_name" type="text" maxlength="150" required
+                         value="<?= e($val('full_name', $account['full_name'])) ?>">
+                  <?php if (isset($fieldErrors['full_name'])): ?>
+                    <div class="ef-error"><?= e((string) $fieldErrors['full_name']) ?></div>
+                  <?php endif; ?>
+                </div>
+
+                <div class="ef-field">
+                  <label class="ef-label" for="email">Email</label>
+                  <input class="ef-input<?= isset($fieldErrors['email']) ? ' is-invalid' : '' ?>"
+                         id="email" name="email" type="email" maxlength="255" required
+                         autocomplete="off" spellcheck="false"
+                         value="<?= e($val('email', $account['email'])) ?>">
+                  <?php if (isset($fieldErrors['email'])): ?>
+                    <div class="ef-error"><?= e((string) $fieldErrors['email']) ?></div>
+                  <?php endif; ?>
+                  <p class="ef-note">Changing it means the learner must verify the new address.</p>
+                </div>
+
+                <div class="ef-field">
+                  <label class="ef-label" for="program">Programme</label>
+                  <input class="ef-input<?= isset($fieldErrors['program']) ? ' is-invalid' : '' ?>"
+                         id="program" name="program" type="text" maxlength="100" required
+                         value="<?= e($val('program', $account['program'])) ?>">
+                  <?php if (isset($fieldErrors['program'])): ?>
+                    <div class="ef-error"><?= e((string) $fieldErrors['program']) ?></div>
+                  <?php endif; ?>
+                </div>
+
+                <div class="ef-field">
+                  <label class="ef-label" for="year_level">Year level</label>
+                  <select class="ef-input<?= isset($fieldErrors['year_level']) ? ' is-invalid' : '' ?>"
+                          id="year_level" name="year_level">
+                    <?php for ($y = 1; $y <= 5; $y++): ?>
+                      <option value="<?= $y ?>"<?= $draftYear === $y ? ' selected' : '' ?>>Year <?= $y ?></option>
+                    <?php endfor; ?>
+                  </select>
+                  <?php if (isset($fieldErrors['year_level'])): ?>
+                    <div class="ef-error"><?= e((string) $fieldErrors['year_level']) ?></div>
+                  <?php endif; ?>
+                </div>
+
+                <button class="ef-btn ef-btn-primary" type="submit">Save changes</button>
+              </form>
+
+              <section class="ef-card ef-card-lg">
+                <div class="ef-card-title" style="margin-bottom:6px;">Account status</div>
+                <div class="ef-card-sub" style="margin-bottom:14px;">
+                  <?= $isActive
+                        ? 'Deactivating stops them signing in and ends any open session. Nothing is deleted, and you can activate the account again at any time.'
+                        : 'This account cannot sign in. Activating it restores access with everything it had before.' ?>
+                </div>
+                <form method="post" action="actions/admin_user_status.php" style="margin:0;"
+                      data-confirm="<?= e($isActive
+                          ? 'Deactivate ' . $account['email'] . '? They will be signed out and unable to sign in until you activate the account again.'
+                          : 'Activate ' . $account['email'] . '? They will be able to sign in again.') ?>">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="user_id" value="<?= $aid ?>">
+                  <input type="hidden" name="status" value="<?= $isActive ? 'inactive' : 'active' ?>">
+                  <button class="ef-btn <?= $isActive ? 'ef-btn-ghost ef-btn-warn' : 'ef-btn-primary' ?>" type="submit">
+                    <?= $isActive ? 'Deactivate account' : 'Activate account' ?>
+                  </button>
+                </form>
+              </section>
+
+              <section class="ef-card ef-card-lg">
+                <div class="ef-card-title" style="margin-bottom:6px;">Export their data</div>
+                <div class="ef-card-sub" style="margin-bottom:14px;">
+                  The same JSON file the learner can download from their own Settings.
+                </div>
+                <form data-no-loading action="actions/admin_user_export.php" method="post" style="margin:0;">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="user_id" value="<?= $aid ?>">
+                  <input type="hidden" name="from" value="account">
+                  <button class="ef-btn ef-btn-ghost" type="submit">Download export</button>
+                </form>
+              </section>
+
+              <form class="ef-card ef-card-lg ef-account-danger" action="actions/admin_user_delete.php" method="post"
+                    data-confirm="<?= e('Permanently delete ' . $account['email'] . ' and everything stored under it? This cannot be undone.') ?>">
+                <?= csrf_field() ?>
+                <input type="hidden" name="user_id" value="<?= $aid ?>">
+                <input type="hidden" name="from" value="account">
+                <div class="ef-card-title" style="margin-bottom:6px;color:var(--ef-weak);">Delete account</div>
+                <div class="ef-card-sub" style="margin-bottom:14px;">
+                  Removes their materials, topics, attempts, answers, conversations,
+                  notifications, support requests and uploaded files. This cannot be undone.
+                  Consider deactivating instead.
+                </div>
+                <div class="ef-field">
+                  <label class="ef-label ef-label-plain" for="confirm_email">
+                    To confirm, type <strong><?= e((string) $account['email']) ?></strong>
+                  </label>
+                  <input class="ef-input" type="text" id="confirm_email" name="confirm_email"
+                         autocomplete="off" spellcheck="false"
+                         placeholder="<?= e((string) $account['email']) ?>" required>
+                </div>
+                <button class="ef-btn ef-btn-ghost ef-btn-danger" type="submit">Delete permanently</button>
+              </form>
+
+            <?php endif; ?>
+          </div>
+        </div>
+
+      </div>
+'''
+
+
 PAGES = [
     ("dashboard.php", "Dashboard",             "dashboard", DASHBOARD, STATS),
     ("companion.php", "AI Learning Companion", "companion", COMPANION,
@@ -3443,6 +4285,10 @@ PAGES = [
      "require_once __DIR__ . '/../includes/legal.php';"),
     ("support.php",   "Support",               "support",   SUPPORT,
      "require_once __DIR__ . '/../includes/support.php';\nrequire_once __DIR__ . '/../includes/legal.php';"),
+    # One request and its replies, the learner's side. Active key 'support' so
+    # the Support row stays highlighted in the sidebar.
+    ("support_thread.php", "Support",          "support",   SUPPORT_THREAD,
+     SUPPORT_THREAD_REQUIRES),
     # admin_require() calls auth_require_login() itself and then checks the
     # is_admin flag, so putting it in the requires slot gates the page before a
     # single byte of output. A gate placed after the HTML has started is not a
@@ -3456,6 +4302,18 @@ PAGES = [
      "require_once __DIR__ . '/../includes/admin.php';\nadmin_require();"),
     ("admin_feedback.php", "Manage Feedback", "admin_feedback", ADMIN_FEEDBACK,
      "require_once __DIR__ . '/../includes/admin.php';\nadmin_require();"),
+    # One conversation, the team's side. Active key starts with 'admin' so the
+    # SHELL guard lets the team in and the help desk nav renders, with Manage
+    # Requests highlighted.
+    ("admin_thread.php",   "Conversation",    "admin_requests", ADMIN_THREAD,
+     ADMIN_THREAD_REQUIRES),
+    # Manage User Accounts, the list and one account. avatar.php for the
+    # initials; both active keys start with 'admin' for the SHELL guard.
+    ("admin_users.php",    "Manage User Accounts", "admin_users", ADMIN_USERS,
+     "require_once __DIR__ . '/../includes/admin.php';\n"
+     "require_once __DIR__ . '/../includes/avatar.php';\nadmin_require();"),
+    ("admin_user.php",     "Account Details", "admin_users",    ADMIN_USER,
+     ADMIN_USER_REQUIRES),
     # The team's own settings. $active starts with 'admin', so the SHELL guard
     # leaves it alone and the sidebar renders the help desk nav rather than the
     # learner one. That mismatch is exactly what this page exists to fix.

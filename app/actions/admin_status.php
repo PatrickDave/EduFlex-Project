@@ -29,15 +29,16 @@ $status    = (string) ($_POST['status'] ?? '');
    from the POST as given. An unchecked "back" field is an open redirect wearing
    a different hat, and that exact mistake has already been made once in this
    codebase: see auth_safe_redirect_target() and README 1c. */
-$pages = ['admin.php', 'admin_requests.php', 'admin_feedback.php'];
+$pages = ['admin.php', 'admin_requests.php', 'admin_feedback.php', 'admin_thread.php'];
 $page  = (string) ($_POST['back'] ?? 'admin_requests.php');
 if (!in_array($page, $pages, true)) {
     $page = 'admin_requests.php';
 }
 
 // Keep the filters the admin was looking at, so the list does not jump back to
-// "all" on every change.
-$query = [];
+// "all" on every change. The conversation page needs its request id instead,
+// taken from the integer already cast above, never from the POST as given.
+$query = $page === 'admin_thread.php' ? ['id' => $requestId] : [];
 foreach (['status_filter' => 'status', 'type_filter' => 'type'] as $field => $key) {
     $value = trim((string) ($_POST[$field] ?? ''));
     if ($value !== '') {

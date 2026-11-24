@@ -255,3 +255,41 @@ and no row was lost; `tools/migrate.php` applies it with
 token rather than minting a new one. **Both halves are needed.** The key alone
 still leaves the cookie being overwritten; the reuse alone cannot store the
 second row, and registration fails with "Could not create the account."
+
+## 11. The whole `support_reply` table
+
+Added 19 November 2026, so the project team can answer a support request and
+the learner can answer back.
+
+Before this the team could only change a request's status. A learner saw
+"Being looked at" or "Resolved" and never learned what had been found or what
+to do next. One row per message under a request; the request's own `message`
+column stays the first message of the thread, so nothing already stored moves.
+
+Columns:
+
+- `request_id` cascades on delete, so deleting a request, or the learner who
+  sent it, removes the whole conversation.
+- `author_id` is `ON DELETE SET NULL`. If a team account is deleted the reply
+  stays, because the learner was told something and should still be able to
+  read it. The screen then shows "Project team" without a name.
+- `from_team` is written at the moment of the reply, never derived later from
+  `user.is_admin`. Revoking a team member's flag must not rewrite history and
+  relabel their old replies as the learner's.
+
+Rules held in `includes/support.php` and `includes/admin.php`, all asserted in
+`tests/support_test.php` and `tests/admin_test.php`:
+
+- A learner can reply only on their own request, checked in SQL by
+  `user_id`, never from the session alone.
+- A learner cannot reply on a closed request. Replying on a resolved one
+  reopens it, so the team sees it again.
+- A team reply on an open request moves it to "Being looked at", and tells the
+  learner through `notify()`, once per reply.
+- The team is NOT notified when a learner replies. The bell opens
+  `notifications.php`, a learner page that team accounts are redirected away
+  from, so a count there could never be cleared. The help desk instead marks
+  each request whose last message is the learner's as "Needs a reply".
+
+Chapter III has no such table. Like `user.is_admin` (section 9), it extends
+Module 7 beyond the data dictionary and needs writing into the manuscript.

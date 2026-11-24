@@ -50,7 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 
-<div class="ef-auth-page">
+<?php /* The animated AI background. See partials/ai_background.php. */ ?>
+<?php include __DIR__ . '/partials/ai_background.php'; ?>
+
+<div class="ef-auth-page has-ai-bg">
 
   <nav class="ef-topnav">
     <a href="index.php" class="ef-logo">EduFlex</a>

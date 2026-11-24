@@ -81,7 +81,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 
-<div class="ef-auth-page">
+<?php /* The animated AI background. See partials/ai_background.php. */ ?>
+<?php include __DIR__ . '/partials/ai_background.php'; ?>
+
+<div class="ef-auth-page has-ai-bg">
 
   <nav class="ef-topnav">
     <a href="index.php" class="ef-logo">EduFlex</a>
@@ -98,12 +101,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Learner sign-in
       </a>
 
-      <div class="ef-auth-card ef-auth-card-admin">
+      <?php /* ef-auth-card-error plays the error animation (section 19 of
+               eduflex.css), only when the server refused this sign-in. */ ?>
+      <div class="ef-auth-card ef-auth-card-admin<?= !empty($errors) ? ' ef-auth-card-error' : '' ?>">
 
         <?php $current = 'admin'; include __DIR__ . '/partials/auth_tabs.php'; ?>
 
         <h2>Help Desk</h2>
         <p class="ef-auth-sub">Sign in to read and answer learner requests</p>
+
+        <?php /* Set by auth/logout.php when a team account signs out. A query
+                 flag, like ?team=1 above, because the session is gone. Not
+                 shown beside a failed sign-in, where it would be stale. */ ?>
+        <?php if (isset($_GET['signed_out']) && empty($errors)): ?>
+          <?php $signedOutTeam = true; include __DIR__ . '/partials/signed_out_notice.php'; ?>
+        <?php endif; ?>
 
         <?php if ($fromLearnerDoor): ?>
           <div class="ef-alert ef-alert-info">
@@ -133,7 +145,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
           </div>
 
-          <button type="submit" class="ef-btn ef-btn-primary ef-btn-block ef-btn-field">
+          <button type="submit" class="ef-btn ef-btn-primary ef-btn-block ef-btn-field"
+                  data-loading-text="Authenticating...">
             Sign in
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3 8h9m0 0-3.5-3.5M12 8l-3.5 3.5" stroke="currentColor"

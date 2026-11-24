@@ -136,13 +136,19 @@ check('does not create a second row', (int) $count['c'] === 1);
 
 section('Login');
 
+unset($_SESSION['_login_welcome']);
+
 $r = auth_login('patrick@example.com', 'wrong-password');
 check('rejects a wrong password', $r['ok'] === false);
 $wrongPasswordMessage = $r['errors']['form'] ?? '';
+/* 20 November 2026: the "Login Successful!" animation plays only when this
+   marker is set. A failed sign-in must never set it. */
+check('a wrong password never arms the success animation', !isset($_SESSION['_login_welcome']));
 
 $r = auth_login('nobody@example.com', 'whatever-1234');
 check('rejects an unknown email', $r['ok'] === false);
 $unknownEmailMessage = $r['errors']['form'] ?? '';
+check('nor does an unknown email', !isset($_SESSION['_login_welcome']));
 
 check('gives the SAME message for wrong password and unknown email',
     $wrongPasswordMessage !== '' && $wrongPasswordMessage === $unknownEmailMessage);
@@ -150,6 +156,103 @@ check('gives the SAME message for wrong password and unknown email',
 $r = auth_login('  PATRICK@example.com ', 'correct-horse-8');
 check('accepts correct credentials, case and space insensitive', $r['ok'] === true);
 check('populates the session', ($_SESSION['user_id'] ?? null) === 1);
+check('a successful sign-in arms the success animation, once', ($_SESSION['_login_welcome'] ?? null) === 1);
+
+check('the marker is set in auth_complete_login() and nowhere else', (function () {
+    // The one place a sign-in becomes real, after password, emailed code and
+    // the active check. Setting it anywhere earlier could show success for a
+    // login that then failed.
+    $hits = 0;
+    foreach (array_merge(glob(__DIR__ . '/../*.php') ?: [], glob(__DIR__ . '/../includes/*.php') ?: [],
+                         glob(__DIR__ . '/../app/*.php') ?: [], glob(__DIR__ . '/../app/actions/*.php') ?: []) as $f) {
+        $hits += preg_match_all("/\\\$_SESSION\['_login_welcome'\]\s*=/", php_strip_whitespace($f));
+    }
+    $auth = php_strip_whitespace(__DIR__ . '/../includes/auth.php');
+    $from = strpos($auth, 'function auth_complete_login');
+    $to   = strpos($auth, 'function auth_logout');
+    $body = $from !== false && $to !== false ? substr($auth, $from, $to - $from) : '';
+    return $hits === 1 && str_contains($body, "\$_SESSION['_login_welcome'] = 1");
+})());
+
+check('the app shell shows it once, on learner and admin pages alike', (function () {
+    // Since 24 November 2026 the team sees it too, with its own wording.
+    $dash  = (string) file_get_contents(__DIR__ . '/../app/dashboard.php');
+    $admin = (string) file_get_contents(__DIR__ . '/../app/admin.php');
+    foreach ([$dash, $admin] as $page) {
+        if (!str_contains($page, "unset(\$_SESSION['_login_welcome'])")
+            || !str_contains($page, 'partials/login_welcome.php')) {
+            return false;
+        }
+    }
+    // The team's wording is chosen from the server's own role check.
+    return str_contains($admin, '$loginWelcomeTeam = $loginWelcome && admin_is_admin($user)');
+})());
+
+check('each door shows its own message', (function () {
+    $p = (string) file_get_contents(__DIR__ . '/../partials/login_welcome.php');
+    return str_contains($p, 'Opening the Admin Dashboard')
+        && str_contains($p, 'Preparing your personalized learning experience')
+        && str_contains($p, '<?= e($welcomeText) ?>');
+})());
+
+check('the admin door animates Authenticating and its errors too', (function () {
+    $a = (string) file_get_contents(__DIR__ . '/../admin_login.php');
+    return str_contains($a, 'data-loading-text="Authenticating..."')
+        && str_contains($a, "ef-auth-card-error");
+})());
+
+/* 24 November 2026: signing out says so, at the right door. */
+check('sign-out reads who it was BEFORE ending the session', (function () {
+    // After auth_logout() there is no session to ask, so the order matters.
+    $s = php_strip_whitespace(__DIR__ . '/../auth/logout.php');
+    $who = strpos($s, 'admin_is_admin(auth_user())');
+    $out = strpos($s, 'auth_logout()');
+    return $who !== false && $out !== false && $who < $out;
+})());
+
+check('everybody lands on the landing page, flagged by who they were', (function () {
+    // Patrick's call, 24 November 2026: sign-out goes to the landing page.
+    $s = (string) file_get_contents(__DIR__ . '/../auth/logout.php');
+    return str_contains($s, "redirect('../index.php?signed_out=' . (\$wasTeam ? 'team' : '1'))");
+})());
+
+check('the landing page shows the toast, choosing the team wording only for exactly "team"', (function () {
+    $i = (string) file_get_contents(__DIR__ . '/../index.php');
+    return str_contains($i, "isset(\$_GET['signed_out'])")
+        && str_contains($i, "(\$_GET['signed_out'] ?? '') === 'team'")
+        && str_contains($i, 'partials/signed_out_notice.php')
+        && str_contains($i, 'data-toast-close');
+})());
+
+check('the signed-out message prints nothing from the address bar', (function () {
+    // Fixed wording only, so ?signed_out=<script> cannot put anything on the page.
+    $p = (string) file_get_contents(__DIR__ . '/../partials/signed_out_notice.php');
+    return !str_contains($p, '$_GET') && !str_contains($p, '$_REQUEST')
+        && str_contains($p, 'You have signed out successfully.')
+        && str_contains($p, 'You have signed out of the Admin Dashboard.');
+})());
+
+check('each door shows its own signed-out message', (function () {
+    $l = (string) file_get_contents(__DIR__ . '/../login.php');
+    $a = (string) file_get_contents(__DIR__ . '/../admin_login.php');
+    return str_contains($l, '$signedOutTeam = false;') && str_contains($a, '$signedOutTeam = true;');
+})());
+
+check('the sidebar sign-out link still works without JavaScript', (function () {
+    // data-signout only adds the brief screen; the href is what signs out.
+    $s = (string) file_get_contents(__DIR__ . '/../partials/sidebar.php');
+    return (bool) preg_match('/<a class="ef-nav-item" href="\.\.\/auth\/logout\.php" data-signout/', $s);
+})());
+
+check('a learner refused at the admin door loses the marker with the session', (function () {
+    // admin_login.php calls auth_logout() on correct credentials that are not
+    // a team account, so the session, and the marker in it, are destroyed
+    // before any page could show success.
+    $a = php_strip_whitespace(__DIR__ . '/../admin_login.php');
+    $ok   = strpos($a, "if (\$result['ok'])");
+    $out  = strpos($a, 'auth_logout()', (int) $ok);
+    return $ok !== false && $out !== false;
+})());
 
 section('Session state');
 
@@ -162,8 +265,10 @@ check('first name is extracted',        auth_first_name() === 'Patrick');
 section('Suspended accounts');
 
 $pdo->exec("UPDATE user SET account_status = 'suspended' WHERE user_id = 1");
+unset($_SESSION['_login_welcome']);
 $r = auth_login('patrick@example.com', 'correct-horse-8');
 check('blocks a suspended account', $r['ok'] === false);
+check('and a blocked account is never shown the success animation', !isset($_SESSION['_login_welcome']));
 $pdo->exec("UPDATE user SET account_status = 'active' WHERE user_id = 1");
 
 section('Logout');

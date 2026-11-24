@@ -27,6 +27,24 @@ security_headers();
 </head>
 <body class="ef-public">
 
+<?php /* The "you have signed out" toast. auth/logout.php sends everybody here
+         with ?signed_out=1 (a learner) or ?signed_out=team (the team). Only
+         the exact value 'team' selects the team wording; nothing from the
+         query string is printed. It dismisses itself after a few seconds, and
+         eduflex.js removes the flag from the address bar. Added 24 November
+         2026; styles in section 21 of eduflex.css. */ ?>
+<?php if (isset($_GET['signed_out'])): ?>
+  <?php $signedOutTeam = ($_GET['signed_out'] ?? '') === 'team'; ?>
+  <div class="ef-toast" data-toast>
+    <?php include __DIR__ . '/partials/signed_out_notice.php'; ?>
+    <button type="button" class="ef-toast-close" data-toast-close aria-label="Dismiss this message">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+<?php endif; ?>
+
 <!-- ===== Top navigation ================================================= -->
 <nav class="ef-topnav">
   <a href="index.php" class="ef-logo">EduFlex</a>
@@ -45,6 +63,12 @@ security_headers();
 </nav>
 
 <!-- ===== Hero =========================================================== -->
+<?php /* The stage spans the full width so the animated AI background can run
+         edge to edge behind a hero that is itself capped at 1440px. The
+         background is contained here, not fixed to the page; see
+         partials/ai_background.php. */ ?>
+<div class="ef-hero-stage">
+<?php $aiBgVariant = 'landing'; include __DIR__ . '/partials/ai_background.php'; ?>
 <header class="ef-hero">
 
   <div>
@@ -182,6 +206,7 @@ security_headers();
     </div>
   </div>
 </header>
+</div><!-- /.ef-hero-stage -->
 
 <!-- ===== How it works =================================================== -->
 <section id="how" style="max-width:1440px;margin:0 auto;padding:0 clamp(18px, 5vw, 48px) 90px;">

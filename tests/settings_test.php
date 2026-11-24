@@ -66,6 +66,11 @@ CREATE TABLE support_request (
   request_type TEXT NOT NULL, subject TEXT NOT NULL, message TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open',
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE support_reply (
+  reply_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL, author_id INTEGER NULL,
+  from_team INTEGER NOT NULL DEFAULT 0, message TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE learning_resource (
   resource_id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES user(user_id) ON DELETE CASCADE,
@@ -142,6 +147,9 @@ function seed_learner(PDO $pdo, string $name, string $email, string $password): 
     $pdo->prepare('INSERT INTO support_request (user_id, request_type, subject, message)
                    VALUES (?, ?, ?, ?)')
         ->execute([$userId, 'question', 'How does mastery work', 'Asked by ' . $name . '.']);
+    $pdo->prepare('INSERT INTO support_reply (request_id, author_id, from_team, message)
+                   VALUES (?, NULL, 1, ?)')
+        ->execute([(int) $pdo->lastInsertId(), 'The team answered ' . $name . '.']);
 
     $pdo->prepare("INSERT INTO learning_resource
         (user_id, title, original_name, storage_path, char_count, chunk_count)
@@ -307,6 +315,13 @@ check('an attempt carries its topic name',
 check('an answer carries whether it was correct',
     (int) $export['answers'][0]['is_correct'] === 1);
 check('the export is dated',            !empty($export['exported_at']));
+check('support requests are included',  count($export['support_requests']) === 1);
+check('the team\'s replies to them are included',
+    count($export['support_replies']) === 1
+    && (string) $export['support_replies'][0]['message'] === 'The team answered Alice.');
+check('a team reply is labelled as the team\'s, without a personal name',
+    (string) $export['support_replies'][0]['author'] === 'project team'
+    && !array_key_exists('author_id', $export['support_replies'][0]));
 
 check('nothing belonging to anybody else is in it', (function () use ($export) {
     $json = json_encode($export);

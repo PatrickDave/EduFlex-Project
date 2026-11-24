@@ -37,6 +37,22 @@ if ($user !== null
     && !str_starts_with($active, 'admin')) {
     redirect('admin.php');
 }
+
+/* The "Login Successful" welcome, once, on the first page after signing in.
+   includes/auth.php sets the marker in auth_complete_login(), which only a
+   successful sign-in reaches. Read and cleared here so a refresh does not
+   replay it. Learners and the team both see it (the team since 24 November
+   2026, at Patrick's request), each with its own message: see
+   partials/login_welcome.php. A learner who tries the admin door is signed
+   out by admin_login.php, which destroys the session and the marker with it,
+   so this never plays for a refused sign-in on either door. */
+$loginWelcome = false;
+$loginWelcomeTeam = false;
+if (isset($_SESSION['_login_welcome'])) {
+    unset($_SESSION['_login_welcome']);
+    $loginWelcome = $user !== null;
+    $loginWelcomeTeam = $loginWelcome && admin_is_admin($user);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -47,7 +63,9 @@ if ($user !== null
 <link href="../assets/vendor/bootstrap-5.3.3.min.css" rel="stylesheet">
 <link href="<?= asset('../assets/css/eduflex.css') ?>" rel="stylesheet">
 </head>
-<body>
+<body<?= $loginWelcome ? ' class="ef-entering"' : '' ?>>
+
+<?php if ($loginWelcome): include __DIR__ . '/../partials/login_welcome.php'; endif; ?>
 
 <div class="ef-shell">
 
@@ -92,8 +110,9 @@ $draftMessage = (string) ($draft['message'] ?? '');
 
         <div class="ef-alert ef-alert-info">
           EduFlex is a capstone prototype, not a product. There is no helpdesk on duty.
-          What you send here is stored against your account for the project team to read,
-          and you will see it in the list below. Nothing is emailed to anybody.
+          What you send here is stored against your account for the project team to read.
+          When they reply, you get a notification and the reply appears under your
+          request below, where you can answer back. Nothing is emailed to anybody.
         </div>
 
         <div class="ef-row">
@@ -170,12 +189,17 @@ $draftMessage = (string) ($draft['message'] ?? '');
                 </div>
               <?php else: ?>
                 <?php foreach ($requests as $r): ?>
-                  <?php $status = (string) $r['status']; ?>
+                  <?php
+                    $status      = (string) $r['status'];
+                    $replyCount  = (int) ($r['reply_count'] ?? 0);
+                    $teamReplies = (int) ($r['team_replies'] ?? 0);
+                    $threadHref  = 'support_thread.php?id=' . (int) $r['request_id'];
+                  ?>
                   <div class="ef-list-row ef-notif">
                     <span class="ef-list-ico">#<?= (int) $r['request_id'] ?></span>
                     <div class="ef-list-main">
                       <div class="ef-notif-head">
-                        <span class="ef-list-title"><?= e((string) $r['subject']) ?></span>
+                        <a class="ef-list-title ef-support-link" href="<?= e($threadHref) ?>"><?= e((string) $r['subject']) ?></a>
                         <span class="ef-band ef-band-<?= e(support_status_band($status)) ?>">
                           <?= e(support_status_label($status)) ?>
                         </span>
@@ -186,7 +210,19 @@ $draftMessage = (string) ($draft['message'] ?? '');
                       <div class="ef-list-meta">
                         <?= e(support_type_label((string) $r['request_type'])) ?>
                       </div>
-                      <div class="ef-notif-body"><?= nl2br(e((string) $r['message'])) ?></div>
+                      <div class="ef-notif-body ef-support-preview"><?= nl2br(e((string) $r['message'])) ?></div>
+                      <div class="ef-support-thread-row">
+                        <?php if ($teamReplies > 0): ?>
+                          <span class="ef-reply-flag ef-reply-flag-team">
+                            The team replied<?= $teamReplies > 1 ? ' ' . $teamReplies . ' times' : '' ?>
+                          </span>
+                        <?php else: ?>
+                          <span class="ef-second" style="font-size:12px;">No reply from the team yet</span>
+                        <?php endif; ?>
+                        <a class="ef-btn ef-btn-ghost ef-btn-sm" href="<?= e($threadHref) ?>">
+                          <?= $replyCount > 0 ? 'View conversation' : 'Open' ?>
+                        </a>
+                      </div>
                     </div>
                   </div>
                 <?php endforeach; ?>

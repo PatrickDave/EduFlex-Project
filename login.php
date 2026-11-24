@@ -69,6 +69,10 @@ $loginNotice = flash_get('error');
    the time the learner arrives here, so this cannot be a flash message. It is
    only an acknowledgement, and it names no account. */
 $justDeleted = isset($_GET['deleted']);
+
+/* Set by auth/logout.php, a query flag for the same reason as $justDeleted.
+   Not shown alongside a failed sign-in, where it would be stale. */
+$justSignedOut = isset($_GET['signed_out']) && empty($errors);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -81,7 +85,10 @@ $justDeleted = isset($_GET['deleted']);
 </head>
 <body>
 
-<div class="ef-auth-page">
+<?php /* The animated AI background. See partials/ai_background.php. */ ?>
+<?php include __DIR__ . '/partials/ai_background.php'; ?>
+
+<div class="ef-auth-page has-ai-bg">
 
   <nav class="ef-topnav">
     <a href="index.php" class="ef-logo">EduFlex</a>
@@ -104,12 +111,19 @@ $justDeleted = isset($_GET['deleted']);
         Back to Home
       </a>
 
-      <div class="ef-auth-card">
+      <?php /* ef-auth-card-error plays the error animation (section 19 of
+               eduflex.css). Only set when this POST was refused by the server,
+               so it never fires on a plain visit. */ ?>
+      <div class="ef-auth-card<?= !empty($errors) ? ' ef-auth-card-error' : '' ?>">
 
       <?php $current = 'user'; include __DIR__ . '/partials/auth_tabs.php'; ?>
 
       <h2>Welcome Back</h2>
       <p class="ef-auth-sub">Access your personalized AI learning path</p>
+
+      <?php if ($justSignedOut): ?>
+        <?php $signedOutTeam = false; include __DIR__ . '/partials/signed_out_notice.php'; ?>
+      <?php endif; ?>
 
       <?php if ($justRegistered): ?>
         <div class="ef-alert ef-alert-ok">
@@ -163,7 +177,8 @@ $justDeleted = isset($_GET['deleted']);
            the code, while requiring the password on every new sign-in. */
         ?>
 
-        <button type="submit" class="ef-btn ef-btn-primary ef-btn-block ef-btn-field">
+        <button type="submit" class="ef-btn ef-btn-primary ef-btn-block ef-btn-field"
+                data-loading-text="Authenticating...">
           Log In
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M3 8h9m0 0-3.5-3.5M12 8l-3.5 3.5" stroke="currentColor"
