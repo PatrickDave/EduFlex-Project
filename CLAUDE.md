@@ -303,15 +303,15 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1352 PHP checks across eighteen suites, all passing, plus 172 browser checks:
+1539 PHP checks across eighteen suites, all passing, plus 173 browser checks:
 
 ```
-auth 87 | extract 44 | ai 94 | questions 73 | attempts 81 | chat 69
-notifications 77 | support 39 | settings 60 | security 79 | avatar 91
+auth 102 | extract 44 | ai 96 | questions 73 | attempts 81 | chat 69
+notifications 77 | support 84 | settings 63 | security 79 | avatar 91
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
-verification 101 | admin 143
+verification 101 | admin 265
 runner_browser 54 | chat_browser 29 | video_browser 31 | password_browser 23
-modules_browser 35
+modules_browser 36
 ```
 
 5 of the 32 extraction checks need the PHP zip extension, because building a
@@ -473,7 +473,9 @@ whether it actually works. Run it before a consultation: it prints the
 per-module tally that feeds the consultation form's scoring, which is one point
 per module per user, Guest 1 plus Learner 7, so eight points.
 
-**25 October 2026: 35 of 35 checks pass, 8 of 8 points.** The first consultation
+**24 November 2026: 36 of 36 checks pass, 8 of 8 points**, re-run after Andrew's
+support replies and user management landed. 25 October was 35 of 35. The first
+consultation
 on 20 September scored 3 of 8, or 37.5 percent.
 
 It is self-contained and non-destructive. It registers its own throwaway
