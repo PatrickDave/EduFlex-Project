@@ -159,6 +159,14 @@ nothing.
    *.md             run_tests.sh     build_pages.py
    ```
 
+   **`config/` IS uploaded.** It is not on that list and it must not be. It
+   carries `config/database.php`, which `includes/security.php` requires on
+   line 16, and `config/.htaccess`, which is what denies the directory to the
+   web. Without them every page is a 500. Only the three files in step 6 are
+   created on the server instead of uploaded, and they are the three that hold
+   secrets, not the whole directory. Patrick hit exactly this on 27 November:
+   everything else uploaded, `config/` empty, every page 500.
+
    None of them are needed to serve the site, and `tests/` and `android/`
    are the bulk of what is left after the video.
 

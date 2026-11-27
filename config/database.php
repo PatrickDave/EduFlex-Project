@@ -82,8 +82,23 @@ function db(): PDO
         // Never show a raw database error to a user; it leaks structure.
         error_log('EduFlex DB connection failed: ' . $e->getMessage());
         http_response_code(500);
+
+        /* The advice differs by machine, and the wrong advice costs real time.
+         * On a laptop the answer is almost always that MySQL is not started.
+         * On a server it is almost always that config/database.local.php is
+         * missing, so these defaults are still pointing at 127.0.0.1 as root
+         * with no password, which no host would ever accept. Telling somebody
+         * on InfinityFree to open the XAMPP Control Panel sends them looking
+         * in the wrong place entirely. */
+        $isLocal = in_array(DB_HOST, ['127.0.0.1', 'localhost', '::1'], true);
         exit('The system cannot reach the database right now. '
-           . 'Check that MySQL is running in the XAMPP Control Panel.');
+           . ($isLocal
+                ? 'If this is a local machine, check that MySQL is running in '
+                . 'the XAMPP Control Panel. If this is a server, it is still '
+                . 'using the local defaults: create config/database.local.php '
+                . 'from config/database.example.php.'
+                : 'Check the credentials in config/database.local.php against '
+                . 'the hosting control panel.'));
     }
 
     return $pdo;
