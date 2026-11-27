@@ -118,13 +118,37 @@ nothing.
    values: host, database name, username, password. **The host is not
    `localhost`.** It is an address like `sql123.infinityfree.com`, and using
    `localhost` fails with an error that reads as though the database is down.
-4. **Import the schema.** Open phpMyAdmin from the control panel and import
-   `database/01_schema.sql`.
+4. **Import the schema.** Open phpMyAdmin from the control panel, **select your
+   database in the left sidebar**, then Import → `database/01_schema_shared_host.sql`
+   → Go.
 
-   That file opens with `DROP DATABASE`, which is correct here because the
-   database is empty and wrong anywhere else. It may need the
-   `CREATE DATABASE` and `USE` lines removed, since shared hosts create the
-   database for you and do not let you make another.
+   **Import that file, not `01_schema.sql`.** The original opens with
+   `DROP DATABASE`, `CREATE DATABASE` and `USE`, which are right for a fresh
+   install on a laptop and refused by a shared host, which creates the one
+   database you may have and disables those statements. Importing the original
+   gives a green "queries executed" banner and a red
+   `"DROP DATABASE" statements are disabled` error at the same time. Both are
+   true: every table is created and the first line fails. The shared-host file
+   imports with no error at all.
+
+   Selecting the database first matters. With none selected, every
+   `CREATE TABLE` fails with "No database selected".
+
+   `01_schema_shared_host.sql` is generated from `01_schema.sql`, so the two
+   cannot disagree:
+
+   ```
+   php tools/make_shared_schema.php           # regenerate
+   php tools/make_shared_schema.php --check    # is it in step?
+   ```
+
+   `tests/admin_test.php` fails if they drift.
+
+   **Do not import `02_migrations.sql` afterwards.** A fresh import already
+   contains every change in it. Verified: importing the shared-host file into
+   an empty database and running `php tools/migrate.php` reports "Nothing to
+   do. This database is up to date." That file is only for a database that
+   already holds data.
 
 5. **Upload the files over FTP** (FileZilla; the control panel shows the
    credentials). Everything goes inside `htdocs`. Skip these:

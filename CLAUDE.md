@@ -284,6 +284,7 @@ app/              seventeen GENERATED pages, plus app/actions/*.php endpoints
 partials/         sidebar.php and topbar.php for the app, public_footer.php
                   for index/login/register/privacy/terms
 database/         01_schema.sql (fresh install, destructive),
+                  01_schema_shared_host.sql (DERIVED, for shared hosting),
                   02_migrations.sql (existing database, safe), SCHEMA-NOTES.md
 tests/            eighteen PHP suites, five Playwright suites
 tools/            rubric_run.php (the only script that spends quota),
@@ -303,13 +304,13 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1539 PHP checks across eighteen suites, all passing, plus 173 browser checks:
+1544 PHP checks across eighteen suites, all passing, plus 173 browser checks:
 
 ```
 auth 102 | extract 44 | ai 96 | questions 73 | attempts 81 | chat 69
 notifications 77 | support 84 | settings 63 | security 79 | avatar 91
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
-verification 101 | admin 265
+verification 101 | admin 270
 runner_browser 54 | chat_browser 29 | video_browser 31 | password_browser 23
 modules_browser 36
 ```
@@ -1045,6 +1046,31 @@ prints a key or a password, only whether one is set.
 **The real win from deploying is the Android app**, and it needs no rebuild:
 point the server address at the public URL and the cable, `adb reverse` and
 the whole USB rehearsal disappear from the demo.
+
+**Import `01_schema_shared_host.sql` on a shared host, not `01_schema.sql`.**
+27 November 2026: Patrick imported the original into InfinityFree and got a
+green "22 queries executed" banner AND a red `"DROP DATABASE" statements are
+disabled` error at once. Both were true, which is the confusing part: every
+table was created and only the first line failed. A shared host creates the one
+database you may have and disables `DROP DATABASE`, `CREATE DATABASE` and `USE`.
+
+The shared-host file is those three statements removed and nothing else. It is
+**derived**, by `php tools/make_shared_schema.php`, because a hand-maintained
+second copy would let a deployed site quietly end up a column behind a fresh
+local install. `--check` compares without writing, and `tests/admin_test.php`
+calls it, so drift fails the suite rather than surfacing on a server. Proved by
+appending a table to `01_schema.sql` alone and watching two checks go red.
+
+**`02_migrations.sql` is NOT imported after a fresh install.** Everything in it
+is already in `01_schema.sql`. Verified by importing the shared-host file into
+a throwaway database and running `tools/migrate.php`, which reported "Nothing to
+do". The throwaway was dropped afterwards and Patrick's 4 accounts, 2 materials,
+29 topics and 6 attempts were confirmed untouched; rule 16 applies to a probe
+database as much as to anything else.
+
+Worth knowing: `config/database.local.php` made that test easy. Pointing
+`DB_NAME` at the throwaway ran the real `migrate.php` against it without
+touching the development database, then the file was deleted.
 
 ## Still to do
 

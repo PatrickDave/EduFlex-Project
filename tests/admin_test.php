@@ -947,6 +947,64 @@ check('and the scan would actually catch one if it existed', (function () {
     return (bool) preg_match('/UPDATE\s+user\s+SET[^;]*is_admin/i', $code);
 })());
 
+/* ------------------------------------------------- the shared-hosting schema */
+
+/* 27 November 2026. Patrick imported 01_schema.sql into InfinityFree and got a
+   green "22 queries executed" banner and a red `"DROP DATABASE" statements are
+   disabled` error at the same time. Both were true: every table was created and
+   the first line failed, because a shared host creates the one database you may
+   have and disables those statements.
+
+   database/01_schema_shared_host.sql is 01_schema.sql with those three
+   statements removed. It is DERIVED, so the risk is that it is regenerated once
+   and then 01_schema.sql changes and nobody notices until a deployed site is
+   missing a column. These checks are what make that fail here instead. */
+
+section('The shared-hosting schema is in step');
+
+check('database/01_schema_shared_host.sql exists',
+    is_file(__DIR__ . '/../database/01_schema_shared_host.sql'));
+
+check('it is exactly what the generator would write today', (function () {
+    // Runs the generator with --check, which rewrites nothing and exits
+    // non-zero on any difference. Calling the real script rather than
+    // reimplementing the comparison here, so there is one definition of
+    // "in step" and not two that can disagree.
+    $tool = escapeshellarg(__DIR__ . '/../tools/make_shared_schema.php');
+    exec(escapeshellarg(PHP_BINARY) . ' ' . $tool . ' --check 2>&1', $out, $code);
+    return $code === 0;
+})());
+
+check('it carries every table the real schema does', (function () {
+    $full   = (string) file_get_contents(__DIR__ . '/../database/01_schema.sql');
+    $shared = (string) file_get_contents(__DIR__ . '/../database/01_schema_shared_host.sql');
+    preg_match_all('/^CREATE TABLE (\w+)/m', $full, $a);
+    preg_match_all('/^CREATE TABLE (\w+)/m', $shared, $b);
+    return $a[1] !== [] && $a[1] === $b[1];
+})());
+
+check('and none of the three statements a shared host refuses', (function () {
+    // Comments only, stripped first: the header names all three to explain
+    // what it removed, and searching the whole file finds its own prose.
+    $shared = (string) file_get_contents(__DIR__ . '/../database/01_schema_shared_host.sql');
+    $sql = implode("\n", array_filter(
+        preg_split('/\R/', $shared) ?: [],
+        static fn(string $line): bool => !str_starts_with(ltrim($line), '--')
+    ));
+    return stripos($sql, 'DROP DATABASE') === false
+        && stripos($sql, 'CREATE DATABASE') === false
+        && !preg_match('/^\s*USE\s+/mi', $sql);
+})());
+
+check('the full schema still DOES carry them, for a fresh local install',
+    (function () {
+        // The destructive version is the right one for `mysql < 01_schema.sql`
+        // on a laptop. Stripping it there would be the opposite mistake.
+        $full = (string) file_get_contents(__DIR__ . '/../database/01_schema.sql');
+        return str_contains($full, 'DROP DATABASE')
+            && str_contains($full, 'CREATE DATABASE');
+    })());
+
 /* ------------------------------------------------------ replying to learners */
 
 /* 19 November 2026. The team can now answer a request, not just move its
