@@ -12,12 +12,28 @@
 
 declare(strict_types=1);
 
-const DB_HOST    = '127.0.0.1';
-const DB_PORT    = 3306;
-const DB_NAME    = 'eduflex';
-const DB_USER    = 'root';
-const DB_PASS    = '';
-const DB_CHARSET = 'utf8mb4';
+/* Deployment credentials go in config/database.local.php, NOT here.
+ *
+ * This file is tracked by git. Typing a live database password into it and
+ * committing publishes that password to a public repository, where rewriting
+ * history does not reliably take it back. config/database.local.php is in
+ * .gitignore for the same reason config/ai.php is.
+ *
+ * It is loaded first and wins, because each constant below is only defined if
+ * nothing has defined it already. Copy config/database.example.php to
+ * database.local.php on the server and fill it in. A machine without that file
+ * keeps the XAMPP defaults, so no teammate has to do anything. */
+$localDatabaseConfig = __DIR__ . '/database.local.php';
+if (is_file($localDatabaseConfig)) {
+    require_once $localDatabaseConfig;
+}
+
+defined('DB_HOST')    || define('DB_HOST', '127.0.0.1');
+defined('DB_PORT')    || define('DB_PORT', 3306);
+defined('DB_NAME')    || define('DB_NAME', 'eduflex');
+defined('DB_USER')    || define('DB_USER', 'root');
+defined('DB_PASS')    || define('DB_PASS', '');
+defined('DB_CHARSET') || define('DB_CHARSET', 'utf8mb4');
 
 /**
  * Injected connection, used by the test suite. Production code never calls

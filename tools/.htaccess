@@ -1,0 +1,23 @@
+# Nothing in tools/ is a web page. Deny the lot.
+#
+# Five of the six scripts here already refuse to run unless PHP_SAPI is 'cli',
+# so they are not reachable through a browser even without this file. This
+# exists for the sixth and for whatever gets added later: a new script is
+# protected the moment it lands, instead of being protected only if whoever
+# wrote it remembered the guard.
+#
+# It matters once EduFlex is on a public host. On a laptop these are reachable
+# only from the laptop; on a shared host tools/rubric_run.php, make_admin.php
+# and deploy_check.php would otherwise answer to anyone who guessed the path.
+#
+# deploy_check.php is meant to be run from a browser on a server with no shell.
+# Copy it to the web root to do that, read it, and delete it. Do not weaken
+# this file to reach it where it sits.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>

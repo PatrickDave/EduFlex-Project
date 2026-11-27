@@ -977,6 +977,53 @@ Python 3.12 was installed for the user with winget on 19 November 2026, at
 `%LOCALAPPDATA%\Programs\Python\Python312\python.exe`. Open a NEW terminal for
 `python build_pages.py` to resolve to it rather than the Store alias.
 
+## Deploying to a public host
+
+Asked for on 27 November 2026. `DEPLOY.md` is the guide;
+`php tools/deploy_check.php` is the readiness check. Nothing is deployed yet.
+
+**Three decisions belong to Patrick and the adviser, not to the code**, and
+they are section 1 of DEPLOY.md: participant data moving onto a company's
+server that nobody consented to, the Gemini free tier's 20 requests a day
+becoming shared with every visitor, and the laptop staying the demo machine
+because it is the one that works with no wifi.
+
+**What rules out most free tiers is outbound traffic, not PHP.** EduFlex needs
+outbound HTTPS for `includes/ai.php` and outbound SMTP on port 587 for
+PHPMailer. Vercel and Netlify cannot run PHP at all; Render and Railway have no
+persistent disk on their free tiers, so uploaded material disappears on
+restart. InfinityFree allows 587 and permits external APIs apart from a
+blocklist, which is why DEPLOY.md recommends it.
+
+**One file does not fit.** InfinityFree caps most files at 10 MB and
+HTML/PHP/JS at 1 MB. Measured: every `.php` and `.js` is under 1 MB, and the
+only file over 10 MB is `assets/video/eduflex-explainer.mp4` at 15.7 MB. Their
+uploader can report success and delete it afterwards. Keep the original in the
+repository either way: `tests/manuscript_test.php` asserts the file exists and
+the laptop demo needs it.
+
+Two things were fixed to make deployment safe, both worth keeping:
+
+- **`config/database.php` is tracked by git**, so typing a live password into
+  it publishes it. It now loads `config/database.local.php` first if present
+  and guards each constant with `defined()`, so the override wins and a
+  machine without that file keeps the XAMPP defaults. Nothing changed for
+  teammates. `config/database.example.php` is the committed template, same
+  pattern as `config/ai.php`.
+- **`tools/` had no `.htaccess`.** Five of the six scripts refuse to run
+  unless `PHP_SAPI` is `cli`, so they were not reachable, but the directory
+  itself was open and a new script would be exposed the moment it landed.
+  Denied as a directory now, like `config/`. Verified: 403 for all three
+  checked.
+
+`deploy_check.php` is the one tool meant to run in a browser, because shared
+hosting has no shell. It needs `?run=1` and says to delete itself. It never
+prints a key or a password, only whether one is set.
+
+**The real win from deploying is the Android app**, and it needs no rebuild:
+point the server address at the public URL and the cable, `adb reverse` and
+the whole USB rehearsal disappear from the demo.
+
 ## Still to do
 
 1. **The AI-output validation rubric run. Start here. Only Patrick can do it.**

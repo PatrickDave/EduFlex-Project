@@ -3,6 +3,12 @@
 config/ai.php
 config/mail.php
 
+# Deployment database credentials. config/database.php IS committed and holds
+# only the XAMPP defaults; this file overrides them on a real server, so it is
+# where a live password would otherwise be published.
+# config/database.example.php is the committed template.
+config/database.local.php
+
 # Uploaded learner material and extracted text.
 storage/uploads/*
 !storage/uploads/.gitkeep
