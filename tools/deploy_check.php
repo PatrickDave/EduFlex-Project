@@ -150,11 +150,24 @@ try {
 
 section('Outbound network (what free hosts block)');
 
-/* HTTPS to the provider. Tested against Google's generic endpoint rather than
-   a model call, so it costs no quota and needs no key. A host that blocks
-   outbound HTTPS fails here and the companion would fail at runtime. */
-if (extension_loaded('curl')) {
-    $ch = curl_init('https://generativelanguage.googleapis.com/');
+/* HTTPS to the provider YOU are configured for, not a fixed one. A host can
+   allow one API host and block another, so testing Google's endpoint while
+   AI_DRIVER is openai-compatible would prove nothing about the call that
+   actually runs.
+
+   Only the host is contacted, never a completion, so this costs no quota and
+   needs no key. Any HTTP status proves the connection was made. */
+$providerHost = 'https://generativelanguage.googleapis.com/';
+if (defined('AI_DRIVER') && AI_DRIVER === 'openai-compatible' && defined('AI_BASE_URL')) {
+    $parts = parse_url((string) AI_BASE_URL);
+    if (!empty($parts['host'])) {
+        $providerHost = ($parts['scheme'] ?? 'https') . '://' . $parts['host'] . '/';
+    }
+}
+if (defined('AI_DRIVER') && AI_DRIVER === 'mock') {
+    result('OK', 'HTTPS out to the provider host', 'not needed, driver is mock');
+} elseif (extension_loaded('curl')) {
+    $ch = curl_init($providerHost);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 12,
@@ -165,7 +178,8 @@ if (extension_loaded('curl')) {
     $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     // Any HTTP status proves the connection was made. 403/404 is fine here.
-    result($code > 0 ? 'OK' : 'FAIL', 'HTTPS out to the provider host',
+    $host = parse_url($providerHost, PHP_URL_HOST) ?: $providerHost;
+    result($code > 0 ? 'OK' : 'FAIL', "HTTPS out to $host",
         $code > 0 ? "reachable (HTTP $code)" : "BLOCKED: $err");
 } else {
     result('FAIL', 'HTTPS out to the provider host', 'curl extension missing');
