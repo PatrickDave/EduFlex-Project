@@ -72,16 +72,14 @@ STARTTLS**, which is exactly what `config/mail.php` already uses, and external
 APIs are allowed except a specific blocklist. Ports 25 and 2525 are blocked,
 and 465 is disputed, so stay on 587.
 
-**One file will not fit.** InfinityFree caps most files at 10 MB and
-HTML/PHP/JS at 1 MB. Checked against this repository:
+**Everything fits, since 27 November.** InfinityFree caps most files at 10 MB
+and HTML/PHP/JS at 1 MB. Checked against this repository:
 
-- Every `.php` and `.js` file is under 1 MB. Fine.
-- `assets/video/eduflex-explainer.mp4` is **15.7 MB and will be rejected**.
-  Worse, their uploader can report success and delete it afterwards.
+- Every `.php` and `.js` file is under 1 MB.
+- `assets/video/eduflex-explainer.mp4` was 15.3 MB and would have been
+  rejected. It is now **8.6 MB** and fits. See section 5.
 
-See section 5 for what to do about the video.
-
-Everything else fits: 175 files, 17.9 MB in total.
+Total: 175 files, about 11 MB.
 
 ### Option B: GitHub Student Developer Pack. Better, slower to set up.
 
@@ -204,24 +202,44 @@ By hand, in this order, because each one tells you something different:
 
 ## 5. The explainer video
 
-15.7 MB against InfinityFree's 10 MB cap. Four options, worst to best:
+**Solved on 27 November. Upload it with everything else.**
 
-1. **Leave it out.** The landing page keeps its poster image and the dialog
-   opens onto a video that 404s. Do not do this: a broken player in front of a
-   panel is worse than no player.
-2. **Remove the player from the deployed copy only.** Honest and tidy, but it
-   edits `index.php` on the server, so the deployed copy drifts from the repo.
-3. **Compress it below 10 MB.** 3:18 at 1920x1080 compresses well; 720p at a
-   lower bitrate would land around 6 to 8 MB. **There is no ffmpeg on this
-   machine**, so this needs installing it or using an online converter. This is
-   the right answer if you have an hour.
-4. **Put it on Google Drive or YouTube and link out.** Note that the CSP is
-   `default-src 'self'`, so an embedded iframe would be blocked by the browser.
-   A plain link that opens in a new tab works and breaks nothing.
+Patrick needs the explainer on the public site, because the adviser wants to
+glance at the work without being in the room. It was 15.3 MB against a 10 MB
+cap, so it was re-encoded to **8.6 MB**, and it fits.
 
-**Keep the 15.7 MB original in the repository either way.** The laptop demo is
-the one that has to work with no wifi, `tests/manuscript_test.php` asserts the
-file exists, and that test should keep passing.
+What was done, in case it ever needs repeating:
+
+```
+ffmpeg -y -i in.mp4 -c:v libx264 -preset slow -b:v 290k -pass 1 -an -f mp4 NUL
+ffmpeg -y -i in.mp4 -c:v libx264 -preset slow -b:v 290k -pass 2 \
+       -profile:v high -level 4.0 -pix_fmt yuv420p -movflags +faststart \
+       -c:a aac -b:a 64k -ac 1 out.mp4
+```
+
+- **Still 1920x1080 and still 3:18.** Nothing was cropped or cut. Downscaling
+  to 720p was rejected: the video is full of UI screenshots with small text,
+  and that text is the first thing a rescale destroys.
+- **Two-pass, not CRF**, because the target here is a file size, and CRF
+  targets a quality level and lands wherever it lands.
+- **Audio went from 130 kb/s stereo to 64 kb/s mono.** It is a single
+  narrator, so stereo was carrying nothing, and that paid for most of the
+  saving on its own.
+- **`-movflags +faststart`** puts the index at the front, so the video starts
+  playing before it has finished downloading. That matters more on a shared
+  host than on localhost.
+- Checked by eye, not just by size: frames at 12s, 75s and 150s compared
+  against the original. The small UI text and the burned-in captions are still
+  legible. `tests/video_browser_test.py` passes all 31 checks, including that
+  playback actually starts.
+
+**There is an ffmpeg on this machine** despite the older note saying otherwise,
+bundled with a VS Code extension at
+`%USERPROFILE%\.vscode\extensions\kilocode.kilo-code-*\bin\ffmpeg.exe`.
+
+**The 15.3 MB master is still in `Claude outputs\Eduflex-Explainer v2.mp4`**,
+which is gitignored and local only. Re-encode from that, never from the 8.6 MB
+copy, or each pass loses more.
 
 ---
 

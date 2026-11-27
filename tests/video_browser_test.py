@@ -2,7 +2,7 @@
 
 Opens the landing page, clicks both things that should open the explainer, and
 verifies what static checks cannot see: that the dialog actually opens, that the
-16 MB file is not fetched until somebody asks for it, and that closing the
+8.6 MB file is not fetched until somebody asks for it, and that closing the
 dialog stops the audio.
 
 That last one is the reason this file exists. A <dialog> that is closed is only
@@ -72,8 +72,8 @@ with sync_playwright() as p:
           page.evaluate("() => getComputedStyle(document.querySelector('%s'))"
                         ".display === 'none'" % DIALOG))
     # preload="none" is what keeps this true. Most visitors never press play,
-    # and 16 MB on every landing page view would be indefensible.
-    check("the 16 MB video has not been requested",
+    # and 8.6 MB on every landing page view would be indefensible.
+    check("the 8.6 MB video has not been requested",
           not any("eduflex-explainer.mp4" in u for u in requests))
 
     section("The hero button opens it")

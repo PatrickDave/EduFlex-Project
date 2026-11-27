@@ -386,7 +386,7 @@ Three design points worth keeping:
 ## The explainer video
 
 Added to the How it Works section of the landing page on 21 September 2026.
-`assets/video/eduflex-explainer.mp4`, 1920x1080, 3:18, about 16 MB, committed
+`assets/video/eduflex-explainer.mp4`, 1920x1080, 3:18, about 8.6 MB, committed
 to the repository because rule 3 means the page has to work in a room with no
 wifi and a video fetched from YouTube would not. `assets/video/.htaccess`
 declares `text/vtt`, which XAMPP's `mime.types` does not.
@@ -401,9 +401,31 @@ caption file matching v2 exists. `tests/manuscript_test.php` asserts that any
 `<track>` on the page points at a file that is really there, so adding one is
 checked rather than silently dead.
 
-The poster is frame 0.6s of the video itself, extracted with headless Chrome
-because there is no ffmpeg on this machine. Without it the player is a black
-rectangle until someone presses play.
+The poster is frame 0.6s of the video itself, extracted with headless Chrome.
+Without it the player is a black rectangle until someone presses play.
+
+**Re-encoded 27 November 2026, 15.3 MB to 8.6 MB**, so it fits under
+InfinityFree's 10 MB per-file cap and can go on the public site. Patrick needs
+it there: the adviser wants to glance at the work without being in the room.
+
+- Still 1920x1080, still 3:18. **Downscaling to 720p was rejected** because the
+  video is mostly UI screenshots with small text, and a rescale destroys that
+  text first. Two-pass x264 at 290 kb/s holds it because the content is nearly
+  static slides.
+- Audio went 130 kb/s stereo to 64 kb/s mono. One narrator, so stereo carried
+  nothing, and that paid for most of the saving by itself.
+- `-movflags +faststart` so it plays before it has finished downloading.
+- Checked by eye at 12s, 75s and 150s against the original, not just by file
+  size. Small UI text and burned-in captions stay legible.
+- The exact command is in DEPLOY.md section 5.
+
+**There IS an ffmpeg on this machine**, contrary to what this file used to say:
+`%USERPROFILE%\.vscode\extensions\kilocode.kilo-code-*\bin\ffmpeg.exe`, bundled
+with a VS Code extension. It has libx264, libvpx-vp9, aac and libopus.
+
+**The 15.3 MB master is `Claude outputs\Eduflex-Explainer v2.mp4`**, gitignored
+and local only. Re-encode from that, never from the 8.6 MB copy, or each
+generation loses more.
 
 **It opens in a dialog, and there is only ever one `<video>` on the page.** Both
 "See How it Works" in the hero and the poster in the How it Works section open
@@ -415,7 +437,7 @@ also brings the focus trap, Escape, and focus restoration for free.
 Three things there are load-bearing, all asserted in
 `tests/video_browser_test.py`:
 
-- **`preload="none"`.** Most visitors never press play, and 16 MB on every
+- **`preload="none"`.** Most visitors never press play, and 8.6 MB on every
   landing page view would be indefensible. Nothing is requested until the dialog
   opens.
 - **`initVideoDialog()` pauses AND rewinds on close.** A closed `<dialog>` is

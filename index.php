@@ -239,7 +239,7 @@ security_headers();
            What sits here is a poster and a play badge, not a player. The real
            <video> lives once, in the dialog at the foot of this page, and both
            this and "See How it Works" in the hero open it. One element rather
-           than two means the 16 MB can never be fetched twice, and preload is
+           than two means the 8.6 MB can never be fetched twice, and preload is
            "none", so nothing at all is fetched until somebody asks to watch. */ ?>
   <figure class="ef-video-figure">
     <button type="button" class="ef-video-trigger" data-video-open
@@ -503,7 +503,7 @@ recency_weight = 1 / (1 + 0.15k)     k = how many answers ago</pre>
          namely the focus trap, Escape to close, and returning focus to whatever
          opened it.
 
-         preload="none" is the important attribute. The file is 16 MB and most
+         preload="none" is the important attribute. The file is 8.6 MB and most
          visitors will never press play, so nothing is requested until they do.
 
          initVideoDialog() in eduflex.js pauses and rewinds on close. Without
@@ -529,7 +529,7 @@ recency_weight = 1 / (1 + 0.15k)     k = how many answers ago</pre>
       <p class="ef-second">
         Your browser cannot play this video.
         <a href="assets/video/eduflex-explainer.mp4">Download it instead</a>
-        (MP4, about 16 MB).
+        (MP4, about 9 MB).
       </p>
     </video>
   </div>
