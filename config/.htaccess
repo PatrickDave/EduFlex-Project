@@ -1,1 +1,18 @@
-Require all denied
+# config/ holds the API key, the SMTP password and, on a server, the database
+# password. Nothing in here is ever fetched over HTTP; PHP reads these files
+# from disk. Deny the directory outright.
+#
+# GUARDED, unlike the single bare line this replaces. "Require" is Apache 2.4
+# and needs mod_authz_core. On a server without it, Apache answers every
+# request under this directory with "Invalid command 'Require'" and a 500,
+# which is a confusing way for a security measure to fail. The 2.2 fallback
+# means the directory is denied either way rather than denied or broken.
+#
+# Matches the guards already in storage/.htaccess and tools/.htaccess.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>

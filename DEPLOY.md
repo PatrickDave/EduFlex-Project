@@ -190,6 +190,35 @@ nothing.
    SSL only needs ordering for a **custom** domain, such as a `.me` from the
    Student Pack.
 
+### If the page is a 500
+
+**Almost certainly an incomplete upload.** This happened on 27 November 2026 on
+`eduflex-infinity09`: only the root `.php` files and `tools/` had arrived.
+`index.php` requires `includes/security.php` on line 12, that file was not
+there, PHP fatalled, and Apache answered 500 with an empty body.
+
+**Find out what is actually missing before re-uploading everything.** Request
+one known file from each directory and read the status code. A 404 means the
+directory never arrived; 200, 403 or 500 all mean it is there:
+
+| Request | Tells you about |
+|---|---|
+| `/includes/helpers.php` | `includes/` |
+| `/config/database.php` | `config/` |
+| `/partials/public_footer.php` | `partials/` |
+| `/assets/css/eduflex.css` | `assets/css/` |
+| `/assets/vendor/jquery-3.7.1.min.js` | `assets/vendor/` |
+| `/app/dashboard.php` | `app/` |
+| `/tools/deploy_check.php` | `tools/` (403 is correct here) |
+
+A **403** from `config/`, `storage/` or `tools/` is the right answer, not a
+problem: those three carry a `.htaccess` that denies the directory. A **404**
+from them means the files are not there at all.
+
+Re-upload the missing directories and **check FileZilla's Failed transfers
+tab** afterwards. It records a failure and then carries on, so a partial upload
+looks finished.
+
 ### If the page is blank
 
 A 200 status with an empty body is PHP fatalling with error display off, which

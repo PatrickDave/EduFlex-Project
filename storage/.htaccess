@@ -8,4 +8,20 @@
     Deny from all
 </IfModule>
 
-php_flag engine off
+# Belt and braces on top of the deny above: even if a future rule allowed
+# something through this directory, PHP would not execute it.
+#
+# GUARDED, and the guard is the point. php_flag only exists when PHP runs as an
+# Apache module. On shared hosting PHP usually runs as CGI or FastCGI instead,
+# where Apache does not know the directive at all and answers every request
+# under this directory with "Invalid command 'php_flag'" and a 500. Unguarded,
+# a line meant to harden uploads becomes the thing that breaks them.
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php5.c>
+    php_flag engine off
+</IfModule>
