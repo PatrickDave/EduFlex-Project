@@ -176,10 +176,41 @@ nothing.
    uploaded with them: it is what stops Apache serving an uploaded file as
    code.
 
-8. **Turn on SSL** in the control panel and wait for the certificate. Then
-   visit over `https://`. `security_is_https()` detects it and switches on the
-   Secure cookie flag and HSTS by itself, with no code change. That closes
-   "Still to do" item 3.
+8. **SSL needs no action on a free subdomain.** The SSL page says "Custom SSL
+   certificates are no longer supported for free subdomains. All free
+   subdomains have SSL by default." That is a notice, not an error, and it
+   means the certificate is already there. **Do not click Create Order.**
+
+   Just visit `https://your-site/`. `security_is_https()` detects it and
+   switches on the Secure cookie flag and HSTS by itself, with no code change,
+   which closes "Still to do" item 3. Verified on
+   `eduflex-infinity09.infinityfreeapp.com`: the TLS handshake succeeds and
+   the certificate validates.
+
+   SSL only needs ordering for a **custom** domain, such as a `.me` from the
+   Student Pack.
+
+### If the page is blank
+
+A 200 status with an empty body is PHP fatalling with error display off, which
+`auth_boot()` turns off on purpose. Nothing reaches the browser, so there is
+nothing to read on screen. In order:
+
+1. **Control panel, Error Log.** This is the fast answer and it names the file
+   and line. Everything below is guesswork by comparison.
+2. **Run the checker.** Copy `tools/deploy_check.php` to the web root and open
+   `?run=1`. Its "Files the landing page needs" section catches an incomplete
+   upload, which is the most common cause: FileZilla logs a failed transfer and
+   then carries on, so a partial upload looks finished.
+3. **Check where the files landed.** They belong directly in `htdocs`, so that
+   `htdocs/index.php` exists. Uploading the project folder itself puts
+   everything one level too deep and the site root is then empty.
+4. **Check `config/` exists on the server** with `database.local.php` in it.
+   A missing `config/ai.php` does NOT break the landing page; nothing on the
+   public path reads it, and `legal.php` guards `AI_DRIVER` with `defined()`.
+
+A blank page is not a damaged database. The import and the upload are separate
+steps and an empty page says nothing about the tables.
 
 9. **Create the team account** through the normal Sign Up form, then grant it:
 

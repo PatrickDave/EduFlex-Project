@@ -74,6 +74,46 @@ $uploadMax = ini_get('upload_max_filesize');
 $postMax   = ini_get('post_max_size');
 result('OK', 'upload_max_filesize / post_max_size', "$uploadMax / $postMax");
 
+/* -------------------------------------------------- the files must be there */
+
+section('Files the landing page needs');
+
+/* An incomplete FTP upload is the most likely reason for a blank page with a
+ * 200 status, which is what EduFlex gives when a require_once target is
+ * missing: PHP fatals, and auth_boot() has already turned display_errors off,
+ * so nothing reaches the browser at all.
+ *
+ * FileZilla reports a failed transfer in its log and then carries on, so a
+ * partial upload looks finished. These are the files index.php actually
+ * reaches on boot, so a gap in the list is the answer rather than a guess. */
+$needed = [
+    'index.php',
+    'config/database.php',
+    'includes/security.php',
+    'includes/helpers.php',
+    'includes/manuscript.php',
+    'includes/auth.php',
+    'includes/legal.php',
+    'partials/ai_background.php',
+    'partials/public_footer.php',
+    'partials/signed_out_notice.php',
+    'assets/css/eduflex.css',
+    'assets/js/eduflex.js',
+    'assets/vendor/bootstrap-5.3.3.min.css',
+    'assets/vendor/jquery-3.7.1.min.js',
+    'includes/vendor/phpmailer/PHPMailer.php',
+];
+$missing = 0;
+foreach ($needed as $rel) {
+    if (!is_file("$root/$rel")) {
+        result('FAIL', $rel, 'MISSING: re-upload it');
+        $missing++;
+    }
+}
+result($missing === 0 ? 'OK' : 'FAIL',
+    sprintf('%d boot files present', count($needed) - $missing),
+    $missing === 0 ? 'nothing missing' : "$missing missing, see above");
+
 /* --------------------------------------------------------------- config */
 
 section('Configuration');
