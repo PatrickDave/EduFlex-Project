@@ -289,6 +289,52 @@ if (is_file("$root/config/ai.php")) {
             : ($keyLen > 0 ? "set ($keyLen characters)" : 'EMPTY'));
 }
 
+/* Email verification is all or nothing, and the half-filled case is the
+ * dangerous one. email_verification_enabled() reads only the 'enabled' flag,
+ * while mail_send_text() also needs a username, a password and a valid
+ * from_email. Set enabled to true with any of those blank and EduFlex starts
+ * demanding a sign-in code that it cannot send: registration and login both
+ * ask for one, and nobody can get in.
+ *
+ * Reported here rather than fixed in email_verification_enabled(), because
+ * the tests inject enabled => true with no credentials on purpose, alongside
+ * a fake sender. The pre-flight is where a server-side mistake belongs.
+ *
+ * Nothing below prints a username, a password or an address. */
+if (is_file("$root/config/mail.php")) {
+    $mail = require "$root/config/mail.php";
+    $mail = is_array($mail) ? $mail : [];
+    $on   = !empty($mail['enabled']);
+
+    $gaps = [];
+    if (empty($mail['username']))                                          { $gaps[] = 'username'; }
+    if (empty($mail['password']))                                          { $gaps[] = 'password'; }
+    if (!filter_var((string) ($mail['from_email'] ?? ''), FILTER_VALIDATE_EMAIL)) { $gaps[] = 'from_email'; }
+
+    $port = (int) ($mail['port'] ?? 0);
+
+    if (!$on) {
+        result('WARN', 'email verification',
+            'OFF (enabled => false). Sign-in codes are not sent, and Settings '
+            . 'says it is unavailable.');
+    } elseif ($gaps !== []) {
+        result('FAIL', 'email verification',
+            'ON but incomplete: ' . implode(', ', $gaps) . ' blank. EduFlex '
+            . 'will demand a code it cannot send and NOBODY WILL BE ABLE TO '
+            . 'SIGN IN. Fill them in, or set enabled => false.');
+    } else {
+        result('OK', 'email verification', 'ON and fully configured');
+    }
+
+    /* 587 with STARTTLS is the only outbound SMTP port InfinityFree allows.
+     * 25, 465 and 2525 are blocked, and includes/mail.php picks STARTTLS for
+     * anything that is not 465, so the port is the whole decision. */
+    result($port === 587 ? 'OK' : 'WARN', 'SMTP port',
+        $port === 587
+            ? '587, STARTTLS'
+            : "$port. Shared hosts usually allow only 587; 25, 465 and 2525 "
+            . 'are commonly blocked.');
+}
 /* -------------------------------------------------------------- storage */
 
 section('Writable storage');

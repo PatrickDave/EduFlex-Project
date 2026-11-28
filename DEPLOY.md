@@ -199,8 +199,64 @@ nothing.
      four values from step 3.
    - `config/ai.php` from `config/ai.example.php`. Set `AI_DRIVER` to `mock`
      unless you have decided otherwise; see section 1b.
-   - `config/mail.php` from `config/mail.example.php`, port 587.
+   - `config/mail.php` from `config/mail.example.php`, port 587. See
+     "Email verification on the live server" below before setting
+     `enabled => true`.
 
+### Email verification on the live server
+
+Settings showing "Email verification is currently unavailable" means
+`mail_config()['enabled']` is false. Either `config/mail.php` does not exist on
+the server, so `mail.example.php` is used as the fallback and it ships with
+`enabled => false`, or the file exists with the flag still off.
+
+**It can work on InfinityFree.** Their own support staff say port 587 with
+STARTTLS is the only outbound SMTP port allowed, and that an external provider
+such as Gmail through PHPMailer is the right approach. 25, 465 and 2525 are
+blocked. `includes/mail.php` already selects STARTTLS for any port other than
+465, so 587 is all that is needed and no code changes.
+
+To turn it on, edit `config/mail.php` on the server:
+
+```php
+return [
+    'enabled'    => true,
+    'host'       => 'smtp.gmail.com',
+    'port'       => 587,
+    'username'   => 'eduflex54@gmail.com',
+    'password'   => 'the 16 character Gmail App Password',
+    'from_email' => 'eduflex54@gmail.com',
+    'from_name'  => 'EduFlex',
+];
+```
+
+The password is a **Gmail App Password**, never the ordinary Google password.
+Generating one requires 2-Step Verification on that Google account. Keep
+`username` and `from_email` the same address, which is what makes SPF and DKIM
+align.
+
+**Fill in every field or leave `enabled => false`.** There is no safe middle.
+`email_verification_enabled()` reads only the flag, while the sender also needs
+a username, a password and a valid `from_email`. Set the flag true with any of
+those blank and EduFlex demands a sign-in code it cannot send, on registration
+and on login both, and nobody can get in. `tools/deploy_check.php` reports this
+case as a FAIL in its Configuration section, along with the SMTP port, so run
+it on the server straight after editing the file:
+
+```
+https://your-site/deploy_check.php?run=1
+```
+
+Its "Outbound network" section opens and closes port 587 without sending
+anything, which proves the host is not blocking it on your account.
+
+**The code may land in Spam.** That is documented in CLAUDE.md and is mostly
+reputation, not configuration: a new Gmail account with no sending history and
+a body shaped like phishing. It does not matter much for the defense, because
+ticking "trust this browser" grants seven days, so one verification per browser
+per week rather than one per sign-in. Sign in once on the demo machine
+beforehand and the panel never sees the email step. A Gmail filter from that
+address set to "Never send it to Spam" is the belt and braces.
 7. **Make the storage directories writable.** Create `storage/uploads` and
    `storage/avatars` over FTP and set them to 755. `storage/.htaccess` must be
    uploaded with them: it is what stops Apache serving an uploaded file as
