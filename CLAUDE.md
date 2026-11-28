@@ -1043,6 +1043,31 @@ Two things were fixed to make deployment safe, both worth keeping:
 hosting has no shell. It needs `?run=1` and says to delete itself. It never
 prints a key or a password, only whether one is set.
 
+**A directory that answers 200 can still be incomplete, and `deploy_check.php`
+used to miss that.** 28 November 2026: the landing page rendered on
+`eduflex-infinity09` while `login.php` and `register.php` were both 500.
+`includes/` had uploaded; `includes/verification.php` inside it had not.
+`index.php` reaches three files in `includes/`. Any page with a sign-in form
+loads `includes/auth.php`, which pulls in four more, `verification.php` among
+them, so one absent file out of twenty-two took down every page that needs a
+password and left the rest looking finished.
+
+The check reported "15 boot files present" throughout, because its list was
+hand-written and named only what `index.php` reaches. A hand-maintained list of
+dependencies is a second copy of the require statements and goes stale the
+first time one is added. **It is now derived**: it reads every PHP file that is
+on the server, pulls out the literal `__DIR__` require targets and names any
+that are missing, so a file is reported by whoever requires it.
+
+**Tokenised with `token_get_all()`, not matched with a regex.** The regex
+written first read the usage example in the docblock at the top of
+`partials/public_footer.php` and reported that file as missing while it sat
+right there. Comments and strings are whole tokens, so an example in a comment
+is skipped. Only literal single-quoted paths count, which is why `mail.php`'s
+deliberate fallback to `mail.example.php` is not flagged. Proved by dropping a
+file carrying all three shapes into `partials/`, watching only the real one
+fail, and deleting it again.
+
 **The real win from deploying is the Android app**, and it needs no rebuild:
 point the server address at the public URL and the cable, `adb reverse` and
 the whole USB rehearsal disappear from the demo.

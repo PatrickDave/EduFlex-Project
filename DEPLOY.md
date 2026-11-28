@@ -227,6 +227,27 @@ Re-upload the missing directories and **check FileZilla's Failed transfers
 tab** afterwards. It records a failure and then carries on, so a partial upload
 looks finished.
 
+### If the landing page works but Sign In and Sign Up are 500
+
+**A directory that answers 200 can still be incomplete.** On 28 November 2026
+`eduflex-infinity09` rendered the landing page perfectly while `login.php` and
+`register.php` both returned 500. `includes/` was there. One file inside it,
+`includes/verification.php`, was not.
+
+`index.php` requires `security.php`, `helpers.php` and `manuscript.php` and
+nothing else. Every page with a sign-in form loads `includes/auth.php`, which
+pulls in four more: `notifications.php`, `avatar.php`, `subscription.php` and
+`verification.php`. A missing `require_once` target is a fatal with an empty
+body, so one absent file out of twenty-two took down the half of the system
+that needs a password while the half that does not looked finished.
+
+The per-directory table above cannot see this: it asks about one file per
+directory, and that file was present. `tools/deploy_check.php` can. It reads
+every PHP file on the server, pulls the `require` targets out of each and
+names any that are not there. **Run it before concluding an upload is
+complete**, and re-upload `includes/` and `partials/` whole rather than
+picking out files by hand.
+
 ### If the page is blank
 
 A 200 status with an empty body is PHP fatalling with error display off, which
@@ -236,9 +257,13 @@ nothing to read on screen. In order:
 1. **Control panel, Error Log.** This is the fast answer and it names the file
    and line. Everything below is guesswork by comparison.
 2. **Run the checker.** Copy `tools/deploy_check.php` to the web root and open
-   `?run=1`. Its "Files the landing page needs" section catches an incomplete
+   `?run=1`. Its "Files the application needs" section catches an incomplete
    upload, which is the most common cause: FileZilla logs a failed transfer and
-   then carries on, so a partial upload looks finished.
+   then carries on, so a partial upload looks finished. That section is derived
+   from the code rather than hand-written, so it covers every page, not just
+   the landing page. It reported "15 boot files present" on 28 November on a
+   server where `includes/verification.php` was missing, because the old list
+   named only what `index.php` reaches.
 3. **Check where the files landed.** They belong directly in `htdocs`, so that
    `htdocs/index.php` exists. Uploading the project folder itself puts
    everything one level too deep and the site root is then empty.

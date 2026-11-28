@@ -76,43 +76,119 @@ result('OK', 'upload_max_filesize / post_max_size', "$uploadMax / $postMax");
 
 /* -------------------------------------------------- the files must be there */
 
-section('Files the landing page needs');
+section('Files the application needs');
 
-/* An incomplete FTP upload is the most likely reason for a blank page with a
- * 200 status, which is what EduFlex gives when a require_once target is
- * missing: PHP fatals, and auth_boot() has already turned display_errors off,
- * so nothing reaches the browser at all.
+/* An incomplete FTP upload is the most likely reason for a 500 with an empty
+ * body, which is what EduFlex gives when a require_once target is missing:
+ * PHP fatals, and auth_boot() has already turned display_errors off, so
+ * nothing reaches the browser at all. FileZilla records a failed transfer in
+ * its log and then carries on, so a partial upload looks finished.
  *
- * FileZilla reports a failed transfer in its log and then carries on, so a
- * partial upload looks finished. These are the files index.php actually
- * reaches on boot, so a gap in the list is the answer rather than a guess. */
-$needed = [
-    'index.php',
-    'config/database.php',
-    'includes/security.php',
-    'includes/helpers.php',
-    'includes/manuscript.php',
-    'includes/auth.php',
-    'includes/legal.php',
-    'partials/ai_background.php',
-    'partials/public_footer.php',
-    'partials/signed_out_notice.php',
+ * DERIVED, not hand-written. The list this replaces named only the files
+ * index.php reaches, so on 28 November 2026 it reported "15 boot files
+ * present" on a server where includes/verification.php had never uploaded:
+ * the landing page rendered perfectly and every page that signs somebody in
+ * returned 500. A hand-maintained list of dependencies is a second copy of
+ * the require statements, and it was wrong the first time one was added.
+ *
+ * So read every PHP file that IS here, pull out its literal __DIR__ requires
+ * and check each target. A file that failed to upload is then named by
+ * whichever present file requires it, which is exactly the fatal the browser
+ * refuses to show. */
+$scan = [];
+foreach (['', 'includes', 'includes/vendor/phpmailer', 'partials',
+          'app', 'app/actions', 'auth', 'config'] as $dir) {
+    $scan = array_merge($scan, glob(rtrim("$root/$dir", '/') . '/*.php') ?: []);
+}
+
+/* TOKENISED, not matched with a regex. The regex this replaces read the
+ * docblock at the top of partials/public_footer.php, which shows the include
+ * line as a usage example, and reported that file as missing while it sat
+ * right there. A check that cries wolf is worse than no check.
+ *
+ * token_get_all() hands back comments and strings as whole tokens, so an
+ * example in a comment is skipped rather than parsed. Literal single-quoted
+ * paths only: a computed path cannot be resolved without running the file,
+ * and mail.php's fallback to mail.example.php is a computed one on purpose. */
+$requireTokens = [T_REQUIRE, T_REQUIRE_ONCE, T_INCLUDE, T_INCLUDE_ONCE];
+$skipTokens    = [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT];
+
+$broken = [];
+foreach ($scan as $file) {
+    $src = @file_get_contents($file);
+    if ($src === false) {
+        continue;
+    }
+    $tokens = @token_get_all($src);
+    $count  = count($tokens);
+
+    for ($i = 0; $i < $count; $i++) {
+        if (!is_array($tokens[$i])
+            || !in_array($tokens[$i][0], $requireTokens, true)) {
+            continue;
+        }
+
+        /* The three meaningful tokens after it must be __DIR__ . 'literal'.
+         * Anything else is a computed path and is left alone. */
+        $next = [];
+        for ($j = $i + 1; $j < $count && count($next) < 3; $j++) {
+            if (is_array($tokens[$j])
+                && in_array($tokens[$j][0], $skipTokens, true)) {
+                continue;
+            }
+            $next[] = $tokens[$j];
+        }
+        if (count($next) < 3
+            || !is_array($next[0]) || $next[0][0] !== T_DIR
+            || $next[1] !== '.'
+            || !is_array($next[2]) || $next[2][0] !== T_CONSTANT_ENCAPSED_STRING
+            || $next[2][1][0] !== "'") {
+            continue;
+        }
+
+        $rel = stripslashes(substr($next[2][1], 1, -1));
+        if (realpath(dirname($file) . $rel) !== false) {
+            continue;
+        }
+        $from = str_replace(DIRECTORY_SEPARATOR, '/', substr($file, strlen($root) + 1));
+        $broken[$from . '  needs  ' . $rel] = true;
+    }
+}
+
+foreach (array_keys($broken) as $line) {
+    result('FAIL', $line, 'MISSING: upload it');
+}
+result($broken === [] ? 'OK' : 'FAIL',
+    sprintf('%d PHP files scanned', count($scan)),
+    $broken === []
+        ? 'every require resolves'
+        : sprintf('%d unresolved require%s, listed above',
+            count($broken), count($broken) === 1 ? '' : 's'));
+
+/* Nothing requires these in PHP, so the scan above cannot see them. The video
+ * is a WARN rather than a FAIL: it is the one file over InfinityFree's 10 MB
+ * cap, and every page still works without it. */
+$assets = [
     'assets/css/eduflex.css',
     'assets/js/eduflex.js',
     'assets/vendor/bootstrap-5.3.3.min.css',
     'assets/vendor/jquery-3.7.1.min.js',
-    'includes/vendor/phpmailer/PHPMailer.php',
+    'assets/video/eduflex-explainer.mp4',
 ];
-$missing = 0;
-foreach ($needed as $rel) {
-    if (!is_file("$root/$rel")) {
-        result('FAIL', $rel, 'MISSING: re-upload it');
-        $missing++;
+$assetFail = 0;
+foreach ($assets as $rel) {
+    if (is_file("$root/$rel")) {
+        continue;
     }
+    if (str_ends_with($rel, '.mp4')) {
+        result('WARN', $rel, 'only the explainer; every page still works');
+        continue;
+    }
+    result('FAIL', $rel, 'MISSING: upload it');
+    $assetFail++;
 }
-result($missing === 0 ? 'OK' : 'FAIL',
-    sprintf('%d boot files present', count($needed) - $missing),
-    $missing === 0 ? 'nothing missing' : "$missing missing, see above");
+result($assetFail === 0 ? 'OK' : 'FAIL', 'stylesheets and scripts present',
+    $assetFail === 0 ? 'nothing missing' : "$assetFail missing, see above");
 
 /* --------------------------------------------------------------- config */
 
