@@ -78,6 +78,55 @@ function csrf_field(): string
 }
 
 /**
+ * A size written in php.ini shorthand, in bytes. "8M" is 8388608.
+ *
+ * 0 and -1 both mean "no limit" to PHP, and both come back as 0 here so a
+ * caller can treat "no limit" as "do not compare against this".
+ */
+function ini_bytes(string $value): int
+{
+    $value = trim($value);
+    if ($value === '' || $value === '0' || $value === '-1') {
+        return 0;
+    }
+    $number = (int) $value;
+    return match (strtolower(substr($value, -1))) {
+        'g'     => $number * 1024 * 1024 * 1024,
+        'm'     => $number * 1024 * 1024,
+        'k'     => $number * 1024,
+        default => $number,
+    };
+}
+
+/**
+ * Did PHP throw the request body away before any of this code ran?
+ *
+ * A POST larger than post_max_size is discarded whole. $_POST and $_FILES are
+ * both empty while CONTENT_LENGTH says bytes did arrive, and PHP reports this
+ * nowhere a page can see. Every later check then fails for the wrong reason,
+ * and the CSRF check is first, so an oversized upload says "Session expired.
+ * Reload the page." and sends somebody to look at their session.
+ *
+ * Reported on 28 November 2026 against the public site, where the limits are
+ * a fraction of XAMPP's. The upload panel promises 20 MB because
+ * UPLOAD_MAX_BYTES says 20 MB; the host had the last word and said nothing.
+ *
+ * Note this is only safe to call because nothing in EduFlex posts a raw body.
+ * Every POST is form-encoded or multipart, so an empty $_POST with a non-zero
+ * CONTENT_LENGTH has exactly one meaning. A JSON endpoint would need to be
+ * excluded here.
+ */
+function request_body_discarded(): bool
+{
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        return false;
+    }
+    if ($_POST !== [] || $_FILES !== []) {
+        return false;
+    }
+    return (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0;
+}
+/**
  * Verify the submitted token. hash_equals avoids timing comparison leaks.
  */
 function csrf_check(?string $submitted): bool

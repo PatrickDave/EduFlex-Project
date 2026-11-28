@@ -393,6 +393,100 @@ check('a session kept busy past the absolute limit is still expired', (function 
 check('the absolute limit is longer than the idle one',
     SESSION_ABSOLUTE_SECONDS > SESSION_IDLE_SECONDS);
 
+/* -------------------------------------------------------------------------
+   A request body PHP threw away
+
+   A POST larger than post_max_size is discarded whole: $_POST and $_FILES are
+   both empty while CONTENT_LENGTH says bytes arrived. Every later check then
+   fails for the wrong reason, and the CSRF check runs first, so an oversized
+   upload used to report "Session expired. Reload the page."
+
+   Reported on 28 November 2026 on the public site, where the limits are a
+   fraction of XAMPP's.
+   ------------------------------------------------------------------------- */
+
+$withRequest = static function (string $method, array $post, array $files,
+                               ?string $length): bool {
+    $savedPost   = $_POST;
+    $savedFiles  = $_FILES;
+    $savedMethod = $_SERVER['REQUEST_METHOD'] ?? null;
+    $savedLength = $_SERVER['CONTENT_LENGTH'] ?? null;
+
+    $_SERVER['REQUEST_METHOD'] = $method;
+    $_POST  = $post;
+    $_FILES = $files;
+    if ($length === null) { unset($_SERVER['CONTENT_LENGTH']); }
+    else                  { $_SERVER['CONTENT_LENGTH'] = $length; }
+
+    $result = request_body_discarded();
+
+    $_POST  = $savedPost;
+    $_FILES = $savedFiles;
+    if ($savedMethod === null) { unset($_SERVER['REQUEST_METHOD']); }
+    else                       { $_SERVER['REQUEST_METHOD'] = $savedMethod; }
+    if ($savedLength === null) { unset($_SERVER['CONTENT_LENGTH']); }
+    else                       { $_SERVER['CONTENT_LENGTH'] = $savedLength; }
+
+    return $result;
+};
+
+check('an empty POST that carried bytes is recognised as discarded',
+    $withRequest('POST', [], [], '9000000') === true);
+
+check('a POST that kept its fields is not',
+    $withRequest('POST', ['_csrf' => 'x'], [], '9000000') === false);
+
+check('a POST that kept its file is not',
+    $withRequest('POST', [], ['document' => ['name' => 'a.pdf']], '9000000') === false);
+
+/* A genuinely empty POST is a different thing and must not be mislabelled as
+   a size problem, or a real CSRF failure starts reporting the wrong cause. */
+check('an empty POST that carried no bytes is not',
+    $withRequest('POST', [], [], '0') === false);
+
+check('a request with no CONTENT_LENGTH at all is not',
+    $withRequest('POST', [], [], null) === false);
+
+check('a GET is never treated as a discarded body',
+    $withRequest('GET', [], [], '9000000') === false);
+
+/* php.ini shorthand. The suffix is what makes 8M mean 8388608 rather than 8. */
+check('ini_bytes reads the php.ini suffixes',
+    ini_bytes('8M') === 8 * 1024 * 1024
+    && ini_bytes('512K') === 512 * 1024
+    && ini_bytes('1G') === 1024 * 1024 * 1024
+    && ini_bytes('1024') === 1024);
+
+/* PHP treats both as "no limit", and a caller must not compare against them. */
+check('ini_bytes reports no limit as zero',
+    ini_bytes('0') === 0 && ini_bytes('-1') === 0 && ini_bytes('') === 0);
+
+/* The guard has to run BEFORE the CSRF check or it can never be reached:
+   csrf_check() fails first on exactly this request and answers 419. */
+/* Comments stripped first. The guard carries a comment explaining why it sits
+   above csrf_check(), and that comment names csrf_check: searching the raw
+   source finds the mention before the call and the check fails on its own
+   documentation. The same trick admin_test.php already uses on includes/. */
+$codeOnly = static function (string $path): string {
+    $out = '';
+    foreach (token_get_all((string) file_get_contents($path)) as $token) {
+        if (is_array($token)
+            && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+            continue;
+        }
+        $out .= is_array($token) ? $token[1] : $token;
+    }
+    return $out;
+};
+
+foreach (['upload_ajax.php', 'upload.php'] as $endpoint) {
+    $src   = $codeOnly(__DIR__ . '/../app/actions/' . $endpoint);
+    $guard = strpos($src, 'request_body_discarded()');
+    $csrf  = strpos($src, 'csrf_check(');
+    check("$endpoint checks for a discarded body before the CSRF token",
+        $guard !== false && $csrf !== false && $guard < $csrf);
+}
+
 $_SESSION = [];
 
 echo "\n=======================\n";

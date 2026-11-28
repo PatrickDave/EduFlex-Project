@@ -70,9 +70,50 @@ foreach (['pdo_mysql' => 'FAIL', 'curl' => 'FAIL', 'mbstring' => 'FAIL',
     result($has ? 'OK' : $severity, "extension: $ext", $note);
 }
 
-$uploadMax = ini_get('upload_max_filesize');
-$postMax   = ini_get('post_max_size');
-result('OK', 'upload_max_filesize / post_max_size', "$uploadMax / $postMax");
+/* The screens promise 20 MB because includes/resources.php says
+ * UPLOAD_MAX_BYTES is 20 MB, but php.ini has the last word and a shared host
+ * sets it far lower. When post_max_size is the smaller, PHP discards the
+ * whole request body, so the upload fails as "Session expired. Reload the
+ * page." and sends somebody to look at their session. Worth saying here, in
+ * the one tool that runs on the server, rather than leaving it to be found.
+ *
+ * Parsed locally rather than through ini_bytes() in includes/helpers.php,
+ * because this script has to keep working when includes/ is the thing that
+ * failed to upload. */
+$iniBytes = static function (string $value): int {
+    $value = trim($value);
+    if ($value === '' || $value === '0' || $value === '-1') {
+        return 0;
+    }
+    $n = (int) $value;
+    switch (strtolower(substr($value, -1))) {
+        case 'g': return $n * 1024 * 1024 * 1024;
+        case 'm': return $n * 1024 * 1024;
+        case 'k': return $n * 1024;
+        default:  return $n;
+    }
+};
+
+$uploadMax = (string) ini_get('upload_max_filesize');
+$postMax   = (string) ini_get('post_max_size');
+$promised  = 20 * 1024 * 1024;   // UPLOAD_MAX_BYTES, without loading includes/
+$allowed   = array_filter([$iniBytes($uploadMax), $iniBytes($postMax)],
+    static fn(int $b): bool => $b > 0);
+$effective = $allowed === [] ? $promised : min($allowed);
+
+result($effective >= $promised ? 'OK' : 'WARN',
+    'upload_max_filesize / post_max_size',
+    "$uploadMax / $postMax"
+    . ($effective >= $promised
+        ? ''
+        : sprintf(', so uploads stop at %d MB although the screens say 20 MB',
+            (int) floor($effective / 1024 / 1024))));
+
+if ($iniBytes($postMax) > 0 && $iniBytes($postMax) < $iniBytes($uploadMax)) {
+    result('WARN', 'post_max_size is below upload_max_filesize',
+        'PHP discards the whole body in that case, and the upload reports a '
+        . 'session problem rather than a size problem');
+}
 
 /* -------------------------------------------------- the files must be there */
 

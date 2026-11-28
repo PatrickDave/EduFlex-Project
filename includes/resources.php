@@ -357,6 +357,35 @@ function resource_totals(int $userId): array
 }
 
 /**
+ * The real ceiling on one upload here, in bytes.
+ *
+ * EduFlex says 20 MB, but php.ini has the last word and a shared host sets it
+ * far lower. The smallest of the three wins, which is what the learner is
+ * actually subject to.
+ */
+function upload_limit_bytes(): int
+{
+    $limits = array_filter([
+        ini_bytes((string) ini_get('post_max_size')),
+        ini_bytes((string) ini_get('upload_max_filesize')),
+        UPLOAD_MAX_BYTES,
+    ], static fn(int $bytes): bool => $bytes > 0);
+
+    return $limits === [] ? UPLOAD_MAX_BYTES : min($limits);
+}
+
+/**
+ * What to say when PHP discarded the upload before any code could see it.
+ *
+ * One sentence in one place, because both upload endpoints need it and the
+ * figure has to come from the server rather than from the 20 MB in the copy.
+ */
+function upload_too_large_message(): string
+{
+    return 'That file is too large for this server. The limit here is '
+        . format_bytes(upload_limit_bytes()) . '.';
+}
+/**
  * Remove a resource, its chunks and its file.
  *
  * The user_id in the WHERE clause is what stops one learner deleting another

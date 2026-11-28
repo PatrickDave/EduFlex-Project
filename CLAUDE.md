@@ -304,11 +304,11 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1550 PHP checks across eighteen suites, all passing, plus 173 browser checks:
+1560 PHP checks across eighteen suites, all passing, plus 173 browser checks:
 
 ```
 auth 102 | extract 44 | ai 96 | questions 73 | attempts 81 | chat 75
-notifications 77 | support 84 | settings 63 | security 79 | avatar 91
+notifications 77 | support 84 | settings 63 | security 89 | avatar 91
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
 verification 101 | admin 270
 runner_browser 54 | chat_browser 29 | video_browser 31 | password_browser 23
@@ -943,6 +943,51 @@ vendored under rule 3 and is far heavier than a 2D canvas needs.
 - To screenshot it headless, use `--force-prefers-reduced-motion`. With
   `--virtual-time-budget` alone Chrome may capture before the 1.4s fade-in
   and the canvas looks empty, which reads as a bug and is not one.
+
+## "Session expired" on an upload, which is not about the session
+
+28 November 2026. An upload through the companion answered "I could not read
+<file>. Session expired. Reload the page." on the public site. Nothing to do
+with the session, and nothing to do with the provider: **no upload path calls
+a provider at all**, because `upload_ajax.php` leaves topic detection as a
+separate, explicit choice precisely so it costs no quota.
+
+**A POST larger than `post_max_size` is discarded whole by PHP.** `$_POST` and
+`$_FILES` come back empty while `CONTENT_LENGTH` says bytes arrived, and PHP
+reports it nowhere a page can see. Every later check then fails for the wrong
+reason, and `csrf_check()` is first, so the learner is told their session
+expired and goes looking at their session.
+
+`UPLOAD_ERR_INI_SIZE` does NOT cover this. That fires when
+`upload_max_filesize` is exceeded and `post_max_size` is not, and
+`resource_upload()` has always handled it correctly. The discarded-body case
+never reaches `resource_upload()` at all.
+
+The tell: the page had just rendered for a signed-in user. A session valid at
+page load and invalid one action later is far more likely to be a token that
+never arrived than a session that died in between.
+
+- `request_body_discarded()` in `includes/helpers.php` detects it. It is only
+  safe because **nothing in EduFlex posts a raw body**: every POST is
+  form-encoded or multipart, so an empty `$_POST` with a non-zero
+  `CONTENT_LENGTH` has exactly one meaning. A JSON endpoint would have to be
+  excluded here.
+- `upload_limit_bytes()` and `upload_too_large_message()` in
+  `includes/resources.php` report the real figure, the smallest of
+  `post_max_size`, `upload_max_filesize` and `UPLOAD_MAX_BYTES`. The screens
+  promise 20 MB; php.ini has the last word.
+- **The guard must sit ABOVE `csrf_check()`** in both `upload_ajax.php` and
+  `upload.php`, or it can never be reached. `tests/security_test.php` asserts
+  the ordering, **with comments stripped by `token_get_all()` first**: the
+  guard's own comment explains why it is above `csrf_check`, and that mention
+  made the naive version fail on its own documentation.
+- `tools/deploy_check.php` now WARNs when the server's limits are below the
+  20 MB the screens advertise, and again when `post_max_size` is below
+  `upload_max_filesize`, which is the configuration that produces this bug.
+  Verified by running it under `-d upload_max_filesize=10M -d post_max_size=8M`.
+
+`app/actions/*.php` are hand-written. Only the seventeen `app/*.php` pages are
+generated, so rule 1 does not apply to the endpoints.
 
 ## The companion's avatar
 

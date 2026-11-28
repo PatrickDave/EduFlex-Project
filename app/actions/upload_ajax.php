@@ -33,6 +33,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     $reply(['ok' => false, 'error' => 'POST required.'], 405);
 }
 
+/* BEFORE the CSRF check, because this is the case where the CSRF token never
+ * arrived. A POST over post_max_size is discarded whole by PHP, so $_POST is
+ * empty and csrf_check() fails: the learner is told their session expired and
+ * goes looking at their session. See request_body_discarded(). */
+if (request_body_discarded()) {
+    $reply(['ok' => false, 'error' => upload_too_large_message()], 413);
+}
+
 if (!csrf_check($_POST['_csrf'] ?? null)) {
     $reply(['ok' => false, 'error' => 'Session expired. Reload the page.'], 419);
 }
