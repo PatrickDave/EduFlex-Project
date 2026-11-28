@@ -1305,9 +1305,31 @@ p { margin: 0; }
 .ef-msg { display: flex; gap: 10px; max-width: 100%; }
 .ef-msg-ai { justify-content: flex-start; }
 .ef-msg-user { justify-content: flex-end; }
+/* The companion's face. A data URI rather than a file in assets/img/, for
+   three reasons that have each cost time on this project already:
+
+   - It ships inside eduflex.css, which every page links through asset() and
+     so carries ?v=<filemtime>. Change the avatar and the URL changes with it.
+     A separate .svg would have no cache busting of its own, which is rule 18
+     exactly: working code that looks broken to whoever reports it.
+   - One fewer file to upload. Two deployments in two days failed on a
+     directory that never made it onto the server.
+   - No extra request, so it is there in a defense room with no wifi. Rule 3.
+
+   The CSP already permits it: img-src is 'self' data:, set in
+   includes/security.php, so this needs no policy change. Changing the policy
+   to make an asset work is the thing rule 11 forbids.
+
+   --ef-primary stays as a fallback layer behind it. If the URI is ever
+   mangled the avatar degrades to the plain blue disc it used to be, rather
+   than to a hole in the layout.
+
+   Head only, not the whole robot. At 32px the full body renders the face too
+   small to read; the crop was chosen by rendering both and looking at them. */
 .ef-msg-avatar {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: var(--ef-primary); flex: 0 0 auto;
+  width: 32px; height: 32px; border-radius: 50%;
+  flex: 0 0 auto;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%23cfe8fb'/%3E%3Cpath d='M3 42A32 32 0 0 1 42 3' fill='none' stroke='%23b9ddf7' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='9.5' r='3.6' fill='%2322c3f0'/%3E%3Cpath d='M32 13v6' stroke='%2322c3f0' stroke-width='2.4' stroke-linecap='round'/%3E%3Crect x='6' y='30' width='6.2' height='14' rx='3.1' fill='%231e9bef'/%3E%3Crect x='51.8' y='30' width='6.2' height='14' rx='3.1' fill='%231e9bef'/%3E%3Crect x='11' y='19' width='42' height='32' rx='11' fill='%23ffffff'/%3E%3Crect x='17' y='24.5' width='30' height='21' rx='9' fill='%230f2742'/%3E%3Ccircle cx='25.6' cy='33' r='3.9' fill='%2322d8f5'/%3E%3Ccircle cx='38.4' cy='33' r='3.9' fill='%2322d8f5'/%3E%3Crect x='28.1' y='39.2' width='7.8' height='2.2' rx='1.1' fill='%2322d8f5'/%3E%3C/svg%3E") center / 100% 100% no-repeat, var(--ef-primary);
 }
 .ef-bubble {
   padding: 15px 18px;

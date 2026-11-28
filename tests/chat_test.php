@@ -336,6 +336,49 @@ check('clearing removes the learner\'s conversation and nothing else',
     && (int) $pdo->query("SELECT COUNT(*) FROM ai_interaction
                            WHERE user_id = 1 AND prompt NOT LIKE 'chat:%'")->fetchColumn() === 1);
 
+/* -------------------------------------------------------------------------
+   The companion's avatar
+
+   It is drawn by CSS on .ef-msg-avatar rather than by markup, because the
+   element is emitted from three places: twice in the generated page, and once
+   by the say() helper in JavaScript when a new message arrives. An SVG pasted
+   into all three would be three copies to keep in step, which is the shape of
+   bug CLAUDE.md already records for the mastery thresholds.
+
+   So the checks are against the stylesheet.
+   ------------------------------------------------------------------------- */
+
+$css = (string) file_get_contents(__DIR__ . '/../assets/css/eduflex.css');
+preg_match('/\.ef-msg-avatar \{.*?\}/s', $css, $avatarRule);
+$avatarRule = $avatarRule[0] ?? '';
+
+check('the companion has an avatar on .ef-msg-avatar',
+    $avatarRule !== '' && str_contains($avatarRule, 'background:'));
+
+check('it is an inline SVG, not a fetched file',
+    str_contains($avatarRule, 'data:image/svg+xml'));
+
+/* Rule 3, enforced rather than promised. An avatar loaded from a CDN would
+   render on a machine with wifi and be a blank disc in the defense room. */
+check('nothing in the stylesheet is fetched from another origin',
+    !preg_match('#url\(\s*[\'"]?(?:https?:)?//#i', $css));
+
+/* Written as a second background layer so a mangled URI degrades to the plain
+   blue disc the avatar used to be, rather than to a hole in the layout. */
+check('the old blue disc remains as a fallback layer',
+    str_contains($avatarRule, 'var(--ef-primary)'));
+
+check('the avatar is square, so the circle is not stretched',
+    preg_match('/width:\s*(\d+)px;\s*height:\s*(\d+)px/', $avatarRule, $m) === 1
+    && $m[1] === $m[2]);
+
+/* A double quote inside the URI would close url("...") early and silently
+   break the rule. The generator refuses one; this is the same check from the
+   other side, against what actually shipped. */
+check('the URI carries no double quote that would close url() early',
+    substr_count($avatarRule, '"') === 2);
+
+
 echo "\n============================\n";
 echo "Passed: $passed   Failed: $failed\n";
 exit($failed === 0 ? 0 : 1);

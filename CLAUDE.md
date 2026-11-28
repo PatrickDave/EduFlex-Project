@@ -304,10 +304,10 @@ exploitable defect the hardening pass found.
 
 ## Test counts
 
-1544 PHP checks across eighteen suites, all passing, plus 173 browser checks:
+1550 PHP checks across eighteen suites, all passing, plus 173 browser checks:
 
 ```
-auth 102 | extract 44 | ai 96 | questions 73 | attempts 81 | chat 69
+auth 102 | extract 44 | ai 96 | questions 73 | attempts 81 | chat 75
 notifications 77 | support 84 | settings 63 | security 79 | avatar 91
 rubric 69 | legal 76 | manuscript 75 | subscription 48 | exams 46
 verification 101 | admin 270
@@ -943,6 +943,46 @@ vendored under rule 3 and is far heavier than a 2D canvas needs.
 - To screenshot it headless, use `--force-prefers-reduced-motion`. With
   `--virtual-time-budget` alone Chrome may capture before the 1.4s fade-in
   and the canvas looks empty, which reads as a bug and is not one.
+
+## The companion's avatar
+
+Added 28 November 2026 at Patrick's request, from a reference image: a friendly
+robot, white head, dark navy face, cyan eyes, on a pale blue disc.
+
+**It is CSS on `.ef-msg-avatar`, not markup.** That element is emitted from
+THREE places: twice in the generated companion page and once by `say()` in the
+page's JavaScript when a new message arrives. An SVG pasted into all three
+would be three copies to keep in step, which is the mastery-thresholds bug in
+a new place. One CSS rule covers history, new messages and the "Reading your
+material..." placeholder at once.
+
+**An inline `data:` URI, not a file in `assets/img/`.** Three reasons:
+
+- It rides inside `eduflex.css`, which every page links through `asset()`, so
+  it carries `?v=<filemtime>`. Change the avatar and the URL changes with it.
+  A standalone `.svg` would have no cache busting of its own, which is rule 18
+  exactly.
+- One fewer file to upload. Two deployments in two days failed on a directory
+  that never reached the server.
+- No extra request, so it is there in a room with no wifi. Rule 3.
+
+**The CSP already allows it.** `img-src 'self' data:` has been in
+`includes/security.php` all along, so no policy change was needed. Widening
+the policy to make an asset work is what rule 11 forbids, and it was worth
+checking before writing the rule rather than after.
+
+`var(--ef-primary)` stays as a second background layer, so a mangled URI
+degrades to the plain blue disc the avatar used to be rather than to a hole.
+
+**Head only, and 32px rather than 28px.** The full robot, body and all, was
+drawn first and rendered at both sizes: at 32px the face is too small to read.
+The crop was chosen by looking at the two side by side, not by reasoning about
+it. Encoding order matters too: `%` must be escaped before `<`, `>` and `#`,
+or every entity comes out doubled, which was the first attempt.
+
+Six checks in `tests/chat_test.php`, including one that fails if anything in
+the stylesheet is ever fetched from another origin. That guard was itself
+tested against seven CSS strings before being trusted.
 
 ## Class names already taken by the companion
 
