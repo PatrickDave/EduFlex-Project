@@ -1068,6 +1068,39 @@ deliberate fallback to `mail.example.php` is not flagged. Proved by dropping a
 file carrying all three shapes into `partials/`, watching only the real one
 fail, and deleting it again.
 
+**A page can also be reached by URL rather than by require, and the first
+version of the derived check was blind to those.** 28 November 2026, the same
+day: `auth/` had not uploaded. It is one file, `logout.php`, and nothing in the
+tree requires it; `partials/sidebar.php` and `app/settings.php` link to it. So
+the site signed people in perfectly and answered 404 on Sign Out, leaving a
+session nobody could end. Visiting `login.php` while still signed in then
+redirects to the dashboard, by design, which Patrick reported as "Sign In goes
+automatically to my profile". Both symptoms, one missing file.
+
+`deploy_check.php` now takes the second route in too: every `href` and
+`action` in the source that names a `.php` file. **Resolved against several
+bases, not just the holding directory.** A partial is included from somewhere
+else, so `partials/topbar.php`'s `href="materials.php"` means
+`app/materials.php` and never `partials/`; resolving from the holding
+directory alone reported eleven present files as missing. A link counts as
+broken only when it resolves from none of root, `app/`, `app/actions/` or its
+own directory. Proved by moving `auth/logout.php` aside, watching exactly the
+two real callers fail, and moving it back.
+
+**DEPLOY.md step 5 is now a positive list of what to upload.** A "skip these"
+list was there first and it failed twice in two days, with `config/` and then
+`auth/`: a directory on neither list is easy to pass over and nothing says it
+is missing.
+
+**A 502 Bad Gateway on the public site is InfinityFree, not EduFlex.** It
+comes from their `openresty` gateway rather than from PHP, so it appears on
+static files as readily as on anything that runs code. Measured: forty
+requests in quick succession returned 502 from the third onwards, including
+for `includes/helpers.php`; eight seconds between requests and every one
+answered 200, with nothing changed on the server in between. It is their rate
+limit. Switching `config/ai.php` to a live provider does not cause it, because
+no page calls a provider on load.
+
 **The real win from deploying is the Android app**, and it needs no rebuild:
 point the server address at the public URL and the cable, `adb reverse` and
 the whole USB rehearsal disappear from the demo.

@@ -165,6 +165,63 @@ result($broken === [] ? 'OK' : 'FAIL',
         : sprintf('%d unresolved require%s, listed above',
             count($broken), count($broken) === 1 ? '' : 's'));
 
+/* A page can also be reached by URL rather than by require, and the scan above
+ * is blind to those: nothing in the tree requires auth/logout.php, the sidebar
+ * just links to it. On 28 November 2026 the whole auth/ directory, one file,
+ * had not uploaded. Signing in worked, so the symptom was Sign Out answering
+ * 404 and the learner stuck in a session they could not end.
+ *
+ * So take the second route in as well: every href and action in the source
+ * that names a .php file. Skipped are the ones that cannot be checked without
+ * running the page: a value containing <?, an absolute URL, and an anchor or
+ * scheme.
+ *
+ * Resolved against SEVERAL bases, not just the directory of the file holding
+ * it. A partial is included from somewhere else, so partials/topbar.php's
+ * href="materials.php" means app/materials.php and never partials/. Resolving
+ * from the holding directory alone reported eleven files as missing while
+ * every one of them was present. A link is counted as broken only when it
+ * resolves from none of the bases, which is what an absent file looks like. */
+$links = [];
+foreach ($scan as $file) {
+    $src = @file_get_contents($file);
+    if ($src === false) {
+        continue;
+    }
+    preg_match_all(
+        '/(?:href|action)\s*=\s*(["\'])([^"\'<>]+?\.php)(?:\?[^"\']*)?\1/i',
+        $src,
+        $found
+    );
+    foreach ($found[2] as $href) {
+        if (str_contains($href, '<?') || str_contains($href, '://')
+            || preg_match('#^(?:mailto:|tel:|/|\#)#', $href)) {
+            continue;
+        }
+        $resolved = false;
+        foreach ([dirname($file), $root, "$root/app", "$root/app/actions"] as $base) {
+            if (realpath("$base/$href") !== false) {
+                $resolved = true;
+                break;
+            }
+        }
+        if ($resolved) {
+            continue;
+        }
+        $from = str_replace(DIRECTORY_SEPARATOR, '/', substr($file, strlen($root) + 1));
+        $links[$from . '  links to  ' . $href] = true;
+    }
+}
+
+foreach (array_keys($links) as $line) {
+    result('FAIL', $line, 'MISSING: upload it');
+}
+result($links === [] ? 'OK' : 'FAIL', 'pages reached by link, not by require',
+    $links === []
+        ? 'every link resolves'
+        : sprintf('%d broken link%s, listed above',
+            count($links), count($links) === 1 ? '' : 's'));
+
 /* Nothing requires these in PHP, so the scan above cannot see them. The video
  * is a WARN rather than a FAIL: it is the one file over InfinityFree's 10 MB
  * cap, and every page still works without it. */

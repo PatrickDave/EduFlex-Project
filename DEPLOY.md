@@ -151,24 +151,46 @@ nothing.
    already holds data.
 
 5. **Upload the files over FTP** (FileZilla; the control panel shows the
-   credentials). Everything goes inside `htdocs`. Skip these:
+   credentials). Everything goes inside `htdocs`.
+
+   **Upload these seven directories and every `.php` file in the project
+   root.** This is a positive list on purpose. A "skip these" list was tried
+   first and it failed twice in two days, because a directory that is on
+   neither list is easy to pass over and nothing says it is missing:
 
    ```
-   .git/            tests/           android/        docs/
-   Claude outputs/  storage/uploads/ storage/avatars/
-   *.md             run_tests.sh     build_pages.py
+   app/         every generated page, plus app/actions/
+   assets/      css, js, vendor, video
+   auth/        ONE file, logout.php. Easiest of all to miss.
+   config/      see below
+   includes/    including includes/vendor/phpmailer/
+   partials/    sidebar, topbar, footers, the shared thread view
+   storage/     the .htaccess only; the two subdirectories go in at step 7
    ```
 
-   **`config/` IS uploaded.** It is not on that list and it must not be. It
-   carries `config/database.php`, which `includes/security.php` requires on
-   line 16, and `config/.htaccess`, which is what denies the directory to the
-   web. Without them every page is a 500. Only the three files in step 6 are
-   created on the server instead of uploaded, and they are the three that hold
-   secrets, not the whole directory. Patrick hit exactly this on 27 November:
-   everything else uploaded, `config/` empty, every page 500.
+   Plus `tools/` if you want to run the readiness check on the server, which
+   step 10 uses.
 
-   None of them are needed to serve the site, and `tests/` and `android/`
-   are the bulk of what is left after the video.
+   Skip `.git/`, `tests/`, `android/`, `docs/`, `Claude outputs/`, the `*.md`
+   files, `run_tests.sh` and `build_pages.py`. None are needed to serve the
+   site, and `tests/` and `android/` are the bulk of what is left after the
+   video.
+
+   Two of those directories have already been missed once each, and neither
+   failure named itself:
+
+   - **`config/` IS uploaded.** It carries `config/database.php`, which
+     `includes/security.php` requires on line 16, and `config/.htaccess`,
+     which denies the directory to the web. Without them every page is a 500.
+     Only the three files in step 6 are created on the server instead of
+     uploaded, and they are the three that hold secrets, not the whole
+     directory. Hit on 27 November: everything else uploaded, `config/`
+     empty, every page 500.
+   - **`auth/` IS uploaded.** One file, `logout.php`. Nothing requires it;
+     the sidebar and Settings link to it, so the site signs people in
+     perfectly and then answers 404 on Sign Out, leaving a session nobody can
+     end. Hit on 28 November. Because it is a single-file directory it is the
+     one most easily skipped by hand.
 
 6. **Create the three config files on the server.** They are gitignored, so
    FTP will not have brought them:
@@ -227,6 +249,32 @@ Re-upload the missing directories and **check FileZilla's Failed transfers
 tab** afterwards. It records a failure and then carries on, so a partial upload
 looks finished.
 
+### If Sign Out is a 404 and Sign In goes straight to the dashboard
+
+**`auth/` did not upload.** It holds one file, `logout.php`, and nothing in
+the tree requires it: the sidebar and Settings link to it. So signing in works,
+Sign Out answers 404, and the session cannot be ended. Visiting `login.php`
+while still signed in then redirects to the dashboard, by design, which reads
+as "Sign In goes straight to my profile". Both symptoms are the one missing
+file. Upload `auth/` and both clear.
+
+### If a page is 502 Bad Gateway
+
+**That is InfinityFree, not EduFlex.** The 502 comes from their `openresty`
+gateway and not from PHP, so it appears on plain static files and on the
+landing page as readily as on anything that runs code. It is their throttle:
+free hosting limits how many requests a visitor may make in a short window.
+
+Confirmed on 28 November 2026 by probing from a real browser. Forty requests in
+quick succession returned 502 from the third onwards, including for
+`includes/helpers.php`, which does nothing. Pausing eight seconds between
+requests and every one answered 200. Nothing was changed on the server between
+the two runs.
+
+Wait a minute and reload before looking for a cause. Switching `config/ai.php`
+to a live provider does not produce it: no page calls a provider on load, by
+design. **For the defense, open the pages a few minutes beforehand** so the
+demo is not the first traffic the host has seen in a while.
 ### If the landing page works but Sign In and Sign Up are 500
 
 **A directory that answers 200 can still be incomplete.** On 28 November 2026
