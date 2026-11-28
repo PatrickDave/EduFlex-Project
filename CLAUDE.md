@@ -1092,6 +1092,43 @@ list was there first and it failed twice in two days, with `config/` and then
 `auth/`: a directory on neither list is easy to pass over and nothing says it
 is missing.
 
+**InfinityFree's firewall refuses any URL containing the word "chat", and that
+is why the companion answered "Could not reach the server".** 28 November 2026.
+The page loaded, the material and topics listed correctly, and the answer never
+came.
+
+Measured rather than guessed, with a browser against paths that do not exist:
+
+```
+includes/zzznotreal.php           404   allowed through, just absent
+includes/chat_zzznotreal.php      403   REFUSED
+app/actions/zzznotreal.php        404   allowed through, just absent
+app/actions/chat_zzznotreal.php   403   REFUSED
+app/actions/zzznotreal_send.php   404   allowed through, just absent
+```
+
+A file that does not exist returning 403 instead of 404 proves the refusal is
+on the URL, not the file. There is no setting for it on a free plan.
+
+**`app/actions/chat_send.php` and `chat_clear.php` are now
+`companion_send.php` and `companion_clear.php`.** Only URLs matter:
+`includes/chat.php` is read from disk by PHP and never fetched over HTTP, so
+its own 403 is cosmetic and the file, the functions and `chat_ask()` keep their
+names. Renaming the library would have been a large change that fixed nothing.
+
+The endpoint was invisible to `deploy_check.php` as well, because it is reached
+by `$.post` and by nothing else: not required, not linked from an href. That is
+the **third** route into a page, after require and href, and seven endpoints
+use it. The check now reads `$.post`, `$.get`, `$.getJSON` and `fetch`
+arguments too. Proved by moving `companion_send.php` aside and watching
+`app/companion.php` report it.
+
+**The lesson is wider than one word.** A deployment can refuse a URL that is
+perfectly good, and the failure arrives as a client-side "could not reach the
+server" with nothing in any log. When an AJAX feature works locally and not on
+a host, request the endpoint directly and read the status before touching the
+code.
+
 **A 502 Bad Gateway on the public site is InfinityFree, not EduFlex.** It
 comes from their `openresty` gateway rather than from PHP, so it appears on
 static files as readily as on anything that runs code. Measured: forty

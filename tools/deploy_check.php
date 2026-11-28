@@ -171,8 +171,9 @@ result($broken === [] ? 'OK' : 'FAIL',
  * had not uploaded. Signing in worked, so the symptom was Sign Out answering
  * 404 and the learner stuck in a session they could not end.
  *
- * So take the second route in as well: every href and action in the source
- * that names a .php file. Skipped are the ones that cannot be checked without
+ * So take the other routes in as well: every href and action in the source
+ * that names a .php file, and every .php path handed to $.post, $.get,
+ * $.getJSON or fetch. Skipped are the ones that cannot be checked without
  * running the page: a value containing <?, an absolute URL, and an anchor or
  * scheme.
  *
@@ -193,7 +194,18 @@ foreach ($scan as $file) {
         $src,
         $found
     );
-    foreach ($found[2] as $href) {
+
+    /* Third route in: an endpoint reached only from JavaScript. The companion
+     * calls actions/companion_send.php with $.post and nothing else, so
+     * neither the require scan nor the href scan can see it. Seven endpoints
+     * are in this position. */
+    preg_match_all(
+        '/(?:\$\.(?:post|get|getJSON)|fetch)\s*\(\s*(["\'])([^"\']+?\.php)(?:\?[^"\']*)?\1/i',
+        $src,
+        $ajax
+    );
+
+    foreach (array_merge($found[2], $ajax[2]) as $href) {
         if (str_contains($href, '<?') || str_contains($href, '://')
             || preg_match('#^(?:mailto:|tel:|/|\#)#', $href)) {
             continue;
@@ -216,7 +228,7 @@ foreach ($scan as $file) {
 foreach (array_keys($links) as $line) {
     result('FAIL', $line, 'MISSING: upload it');
 }
-result($links === [] ? 'OK' : 'FAIL', 'pages reached by link, not by require',
+result($links === [] ? 'OK' : 'FAIL', 'pages reached by link or script',
     $links === []
         ? 'every link resolves'
         : sprintf('%d broken link%s, listed above',

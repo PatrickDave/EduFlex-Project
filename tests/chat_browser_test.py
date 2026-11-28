@@ -162,7 +162,7 @@ with sync_playwright() as p:
     print("\nClearing")
     page.goto(BASE + "/app/companion.php")
     page.wait_for_load_state("networkidle")
-    page.click('form[action="actions/chat_clear.php"] button')
+    page.click('form[action="actions/companion_clear.php"] button')
     page.wait_for_load_state("networkidle")
     body = page.inner_text("body")
     check("the conversation is cleared", "Conversation cleared" in body)

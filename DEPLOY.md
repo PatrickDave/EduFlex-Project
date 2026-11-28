@@ -258,6 +258,38 @@ while still signed in then redirects to the dashboard, by design, which reads
 as "Sign In goes straight to my profile". Both symptoms are the one missing
 file. Upload `auth/` and both clear.
 
+### If the AI Learning Companion says "Could not reach the server"
+
+**InfinityFree's firewall refuses any URL containing the word "chat".** The
+companion page itself loads and lists your material and topics, because
+`app/companion.php` is allowed. The answer never arrives, because the browser
+posts to an endpoint whose address was blocked before it reached PHP. Nothing
+appears in any log, because PHP never ran.
+
+Measured on 28 November 2026 against paths that do not exist:
+
+| Request | Status |
+|---|---|
+| `app/actions/zzznotreal.php` | 404, allowed through |
+| `app/actions/chat_zzznotreal.php` | **403, refused** |
+| `includes/zzznotreal.php` | 404, allowed through |
+| `includes/chat_zzznotreal.php` | **403, refused** |
+
+A file that does not exist answering 403 rather than 404 proves the refusal is
+on the URL and not the file. There is no setting for it on a free plan.
+
+**Already fixed in the code.** The two endpoints are now
+`app/actions/companion_send.php` and `app/actions/companion_clear.php`. Upload
+`app/` again, including `app/actions/`, and delete the two old `chat_*.php`
+files from the server if your FTP client left them behind.
+
+`includes/chat.php` keeps its name and still answers 403 if you request it.
+That is harmless: PHP reads it from disk, and nothing ever fetches it over
+HTTP.
+
+**The general lesson:** when a feature works on the laptop and not on the host,
+request its endpoint directly and read the status code before changing any
+code. A blocked URL and a broken script look identical from the browser.
 ### If a page is 502 Bad Gateway
 
 **That is InfinityFree, not EduFlex.** The 502 comes from their `openresty`

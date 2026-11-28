@@ -303,7 +303,7 @@ $flashError = flash_get('error');
             </p>
             <span style="display:flex;gap:8px;align-items:center;">
               <?php if ($thread): ?>
-                <form method="post" action="actions/chat_clear.php" style="margin:0;">
+                <form method="post" action="actions/companion_clear.php" style="margin:0;">
                   <?= csrf_field() ?>
                   <button class="ef-btn ef-btn-ghost ef-btn-sm" type="submit">
                     Clear chat
@@ -639,7 +639,7 @@ $flashError = flash_get('error');
           say(esc(question), 'user');
           var $pending = say('<span class="ef-typing">Reading your material...</span>', 'ai');
 
-          $.post('actions/chat_send.php', { question: question, _csrf: CSRF })
+          $.post('actions/companion_send.php', { question: question, _csrf: CSRF })
             .done(function (res) {
               if (res && res.ok) {
                 var html = esc(res.answer).replace(/\\n/g, '<br>');  /* doubled: this file is a Python string */
